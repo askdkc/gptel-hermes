@@ -1,0 +1,175 @@
+#+title: gptel-hermes
+#+author: dkc
+
+* 概要
+
+=gptel-hermes= は、Nous Researchが開発したHermes Agentの機能の一部を、Emacsのgptel経由のチャットで利用可能にする独自のEmacs Lispパッケージです。
+
+#+begin_example
+Emacs / gptel
+  └── gptel-hermes.el
+       ├── skills/**/SKILL.md の索引
+       ├── system prompt への索引・メモリ注入
+       ├── hermes_skill_view tool
+       └── hermes_memory tool
+#+end_example
+
+Hermes Agentの機能をEmacsで利用するため、gptel向けに独自実装しています。
+
+* セットアップ
+
+#+begin_src emacs-lisp
+(add-to-list 'load-path "~/YOUR-CODE-PATH/gptel-hermes")
+(require 'gptel-hermes)
+(add-hook 'gptel-mode-hook #'gptel-hermes-enable)
+#+end_src
+
+gptel バッファで手動有効化する場合:
+
+#+begin_src emacs-lisp
+M-x gptel-hermes-enable
+#+end_src
+
+* 設定
+
+** スキルディレクトリ
+
+デフォルトはパッケージ内の =skills/= です。
+
+#+begin_src emacs-lisp
+(setq gptel-hermes-skills-directory
+      "~/YOUR-CODE-PATH/gptel-hermes/skills")
+#+end_src
+
+別の Hermes スキルツリーを使う場合:
+
+#+begin_src emacs-lisp
+(setq gptel-hermes-skills-directory
+      "~/.hermes/profiles/main/skills")
+#+end_src
+
+パッケージ外のディレクトリを指定した場合、最初の =gptel-hermes-enable= 時に、パッケージ内の bundled =skills/= にある索引対象の =SKILL.md= だけが、同じ相対パスで指定先へコピーされます。指定先に同名のファイルが既にある場合は上書きせず、そのファイルを優先します。コピーが完了すると指定先に =.gptel-hermes-bundled-skills= マーカーが作成され、以後の有効化やパッケージ更新で自動的に上書き・再同期されることはありません。
+
+コピー対象は現在のスキル索引と同じ =SKILL.md= のみです。=DESCRIPTION.md=、=references/=、=scripts/= などはコピーされません。同期結果（コピー数、既存ファイル保持数、同期済みでスキップしたこと）はミニバッファの =message= で通知されます。
+
+このリポジトリのデフォルト =skills/= には基本スキルセットを配置済みです。デフォルトの bundled =skills/= 自体を指定した場合は、自己コピーを行いません。
+
+** メモリディレクトリ
+
+=MEMORY.md= と =USER.md= は、デフォルトでは以下から読み書きします。
+
+#+begin_example
+$HERMES_HOME/memories/
+#+end_example
+
+環境変数が無い場合は =~/.hermes/memories/= です。
+
+#+begin_src emacs-lisp
+(setq gptel-hermes-home "~/.hermes/profiles/main")
+#+end_src
+
+* 動作
+
+** 初期 prompt
+
+有効化時、以下を system prompt に snapshot として注入します。
+
+- スキル名
+- description
+- category
+- =MEMORY.md=
+- =USER.md=
+
+=SKILL.md= 本文は最初の prompt には入れません。
+
+** スキル本文
+
+モデルが必要なスキルを選び、=hermes_skill_view= を呼びます。
+
+#+begin_example
+hermes_skill_view("software-development/my-ponytail")
+#+end_example
+
+その結果として、対象 =SKILL.md= の本文が tool result としてモデルへ返ります。
+
+** メモリ
+
+=hermes_memory= は次の操作を提供します。
+
+- =add=
+- =replace=
+- =remove=
+
+対象は以下です。
+
+- =memory= → =MEMORY.md=
+- =user= → =USER.md=
+
+更新は検証後に atomic write されます。
+
+* prompt の確認
+
+現在の gptel バッファに設定された system prompt を確認します。
+
+#+begin_src emacs-lisp
+M-x gptel-hermes-prompt-inspect
+#+end_src
+
+スキル索引とメモリは確認できますが、全文の =SKILL.md= はモデルが =hermes_skill_view= を呼ぶまで入りません。
+
+* 検証
+
+gptel の checkout を load-path に指定して実行します。
+
+#+begin_src sh
+emacs --batch -L /path/to/gptel -L . -f batch-byte-compile gptel-hermes.el
+emacs --batch -L /path/to/gptel -L . -L tests \
+  -l tests/gptel-hermes-tests.el \
+  -f ert-run-tests-batch-and-exit
+#+end_src
+
+- macOSの場合
+  macOSの場合はemacsコマンドは =/Applications= ディレクトリ配下になります。
+  #+begin_src sh
+  /Applications/Emacs.app/Contents/MacOS/Emacs --batch -L /path/to/gptel -L . -f batch-byte-compile gptel-hermes.el
+  /Applications/Emacs.app/Contents/MacOS/Emacs --batch -L /path/to/gptel -L . -L tests \
+  -l tests/gptel-hermes-tests.el \
+  -f ert-run-tests-batch-and-exit
+  #+end_src
+
+現在の検証対象:
+
+- 初期 prompt に索引・メモリ・プロフィールが入る
+- 初期 prompt に全文 =SKILL.md= が入らない
+- 選択した =SKILL.md= が tool result になる
+- メモリの add / replace / remove が永続化される
+- gptel バッファ内の prompt snapshot が安定する
+- 外部スキルディレクトリへの初回 bundled =SKILL.md= 同期
+- 既存 =SKILL.md= の保持と同期完了マーカー
+- 同期済みディレクトリでの再コピー抑止
+- 同期途中のエラー時に完了マーカーを作成しない
+- bundled =skills/= 自体を指定した場合の自己コピー回避
+
+* 現在の未実装機能
+
+Hermes Agentと違う未実装な部分:
+
+- =session_search=
+- =delegate_task=
+- terminal / file 編集 tool
+- background review
+- 外部 memory provider
+
+これらは gptel の skills / memory 経路とは別の agent runtime 機能です。
+
+* ライセンスと Copyright
+
+このプロジェクトの Copyright:
+
+Copyright (c) 2026 dkc
+
+Hermes Agent 由来のコンテンツについては、MIT ライセンスおよび以下の Copyright 表記を参照します。
+
+Copyright (c) 2025 Nous Research
+
+[[https://github.com/NousResearch/hermes-agent/blob/main/LICENSE][Hermes Agent LICENSE]]

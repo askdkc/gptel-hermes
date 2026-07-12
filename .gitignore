@@ -1,0 +1,12 @@
+.DS_Store
+
+# Emacs byte/native compilation and temporary files
+*.elc
+*.eln
+*~
+\#*\#
+.#*
+
+# Generated tags
+TAGS
+tags
