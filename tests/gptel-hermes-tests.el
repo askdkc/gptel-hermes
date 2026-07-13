@@ -393,6 +393,30 @@
            (gptel-hermes-skill-create "must-not-write" "Description" "# Body")))
       (delete-directory root t))))
 
+(ert-deftest gptel-hermes-skill-create-refuses-bundled-subtree-before-writing ()
+  (let* ((root (make-temp-file "gptel-hermes-skill-" t))
+         (bundled-root (expand-file-name "skills" root))
+         (destination (expand-file-name "skills/new/SKILL.md" root)))
+    (make-directory bundled-root t)
+    (unwind-protect
+        (let ((gptel-hermes--bundled-skills-directory bundled-root)
+              (gptel-hermes-skills-directory root))
+          (should-error
+           (gptel-hermes-skill-create "skills/new" "Description" "# Body"))
+          (should-not (file-exists-p destination))
+          (should-not (file-exists-p (file-name-directory destination))))
+      (delete-directory root t))))
+
+(ert-deftest gptel-hermes-custom-options-belong-to-gptel-hermes-group ()
+  (let ((members (get 'gptel-hermes 'custom-group)))
+    (dolist (variable '(gptel-hermes-skills-directory
+                        gptel-hermes-home
+                        gptel-hermes-org-directory-fallback))
+      (should
+       (cl-some (lambda (member)
+                  (eq variable (if (consp member) (car member) member)))
+                members)))))
+
 (ert-deftest gptel-hermes-skill-tools-have-confirmation-policies ()
   (should-not (gptel-tool-confirm gptel-hermes--skill-validate-tool))
   (should (eq t (gptel-tool-confirm gptel-hermes--skill-create-tool)))

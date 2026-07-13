@@ -39,7 +39,8 @@
 
 The bundled skills are copied here on first enable when this directory is
 outside the package."
-  :type 'directory)
+  :type 'directory
+  :group 'gptel-hermes)
 
 (defcustom gptel-hermes-home
   (expand-file-name "~/.gptel-hermes")
@@ -47,7 +48,8 @@ outside the package."
 
 The default is ~/.gptel-hermes.  HERMES_HOME is not used implicitly, so
 gptel-hermes does not share memory with a separate Hermes Agent installation."
-  :type '(choice (const nil) directory))
+  :type '(choice (const nil) directory)
+  :group 'gptel-hermes)
 
 (defconst gptel-hermes--excluded-directories
   '(".git" ".github" ".hub" ".archive" "references" "templates" "assets" "scripts"))
@@ -515,25 +517,33 @@ being enabled."
 
 (defun gptel-hermes--atomic-create (path content)
   "Atomically create PATH with CONTENT, refusing an existing destination."
-  (make-directory (file-name-directory path) t)
-  (unless (gptel-hermes--path-under-directory-p
-           (file-name-directory path) (gptel-hermes--skills-root))
-    (error "Skill destination escapes gptel-hermes-skills-directory: %s" path))
-  (when (or (file-exists-p path) (file-symlink-p path))
-    (error "Skill already exists: %s" path))
-  (let ((temporary (make-temp-file "hermes-skill-" nil ".tmp"
-                                  (file-name-directory path))))
-    (unwind-protect
-        (progn
-          (with-temp-file temporary
-            (insert content))
-          ;; A nil `ok-if-already-exists' makes the final operation
-          ;; new-file-only even if another process created PATH after the
-          ;; preflight check above.
-          (rename-file temporary path nil)
-          (setq temporary nil))
-      (when (and temporary (file-exists-p temporary))
-        (delete-file temporary)))))
+  (let* ((destination (file-truename path))
+         (destination-directory (file-name-directory destination))
+         (skills-root (file-truename (gptel-hermes--skills-root)))
+         (bundled-root (file-truename (gptel-hermes--bundled-skills-root))))
+    (unless (gptel-hermes--path-under-directory-p destination skills-root)
+      (error "Skill destination escapes gptel-hermes-skills-directory: %s"
+             destination))
+    (when (gptel-hermes--path-under-directory-p destination bundled-root)
+      (error "Skill creation is disabled in the bundled skills directory"))
+    (when (or (file-exists-p path) (file-symlink-p path))
+      (error "Skill already exists: %s" path))
+    (make-directory destination-directory t)
+    (when (or (file-exists-p destination) (file-symlink-p destination))
+      (error "Skill already exists: %s" destination))
+    (let ((temporary (make-temp-file "hermes-skill-" nil ".tmp"
+                                    destination-directory)))
+      (unwind-protect
+          (progn
+            (with-temp-file temporary
+              (insert content))
+            ;; A nil `ok-if-already-exists' makes the final operation
+            ;; new-file-only even if another process created PATH after the
+            ;; preflight check above.
+            (rename-file temporary destination nil)
+            (setq temporary nil))
+        (when (and temporary (file-exists-p temporary))
+          (delete-file temporary))))))
 
 (defun gptel-hermes-skill-create (skill-id description body)
   "Create a user-managed SKILL.md from SKILL-ID, DESCRIPTION, and BODY.
@@ -598,7 +608,8 @@ an arbitrary `~/org' tree to be searched implicitly."
   :type '(choice
           (const :tag "Do not use a fallback" nil)
           (const :tag "Use `org-directory'" t)
-          (directory :tag "Use this directory")))
+          (directory :tag "Use this directory"))
+  :group 'gptel-hermes)
 
 (defun gptel-hermes--org-directory-files (directory)
   "Return Org agenda candidates directly under DIRECTORY."

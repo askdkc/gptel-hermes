@@ -283,6 +283,52 @@ Preferred over `cond` for destructuring:
 ;;; foo.el ends here
 ```
 
+### Writing Commentary
+
+The `Commentary` section is what `M-x describe-package` shows. It must be
+self-contained — a user who found the package on MELPA has no other context.
+
+**Structure:**
+1. One-line summary of what the package does
+2. One-paragraph explanation with key features
+3. Minimal setup code block (single `require` + enable)
+4. Optionally: link to full README or manual
+
+**Rules:**
+- Every line starts with `;;` (two semicolons)
+- Blank lines use `;;` alone (not empty)
+- Closing uses `;;; Code:` as the boundary marker
+- Do NOT repeat the file header (`;;; foo.el --- ...`) in Commentary
+
+**Good example (gptel-hermes):**
+```elisp
+;;; Commentary:
+
+;; gptel-hermes makes selected Hermes Agent capabilities available in Emacs
+;; chat sessions through gptel.  It indexes bundled or user-provided
+;; SKILL.md files, loads selected skills on demand, injects persistent
+;; memory into the system prompt, and provides gptel tools for skill
+;; viewing and memory management.
+;;
+;; Add `gptel-hermes-enable' to `gptel-mode-hook' to enable it
+;; automatically:
+;;
+;;   (add-hook 'gptel-mode-hook #'gptel-hermes-enable)
+
+;;; Code:
+```
+
+**Bad example:**
+```elisp
+;;; Commentary:
+
+;; This package does stuff. See README for details.
+
+;;; Code:
+```
+
+**Check:** `M-x checkdoc` validates Commentary completeness.
+
 ### Customization group and options
 ```elisp
 (defgroup foo nil
@@ -359,6 +405,19 @@ When enabled, bars all foos in the current buffer."
 - `provide` at end
 - `M-x checkdoc` passes
 - `M-x package-lint-current-buffer` passes (install `package-lint` from ELPA)
+
+### Batch verification on macOS
+
+If the `emacs` command is not on `PATH`, invoke the macOS application binary
+directly at `/Applications/Emacs.app/Contents/MacOS/Emacs`:
+
+```sh
+/Applications/Emacs.app/Contents/MacOS/Emacs --batch -L /path/to/gptel -L . \
+  -f batch-byte-compile foo.el
+/Applications/Emacs.app/Contents/MacOS/Emacs --batch -L /path/to/gptel -L . -L tests \
+  -l tests/foo-tests.el \
+  -f ert-run-tests-batch-and-exit
+```
 
 ## Error Handling
 
