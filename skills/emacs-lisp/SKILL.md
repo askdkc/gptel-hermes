@@ -493,6 +493,8 @@ directly at `/Applications/Emacs.app/Contents/MacOS/Emacs`:
 (mapcar fn list)
 (mapc fn list)                   ; like mapcar but for side effects only
 (dolist (x list) ...)
+(string-to-list str)              ; string → list of chars (Emacs 30+)
+;; NOTE: dolist does NOT accept strings directly — wrong-type-argument listp
 (cl-remove-if pred list)
 (cl-find item list)
 (seq-filter pred list)           ; seq.el
