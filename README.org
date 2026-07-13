@@ -11,7 +11,11 @@ Emacs / gptel
        ├── skills/**/SKILL.md の索引
        ├── system prompt への索引・メモリ注入
        ├── hermes_skill_view tool
-       └── hermes_memory tool
+       ├── hermes_skill_validate tool
+       ├── hermes_skill_create tool
+       ├── hermes_memory tool
+       ├── hermes_org_agenda tool
+       └── hermes_org_task tool
 #+end_example
 
 Hermes Agentの機能をEmacsで利用するため、gptel向けに独自実装しています。
@@ -84,6 +88,15 @@ M-x gptel-hermes-enable
 
 このリポジトリの bundled =skills/= には基本スキルセットを配置済みです。bundled =skills/= 自体を指定した場合は、自己コピーを行いません。
 
+** Skillの作成と検証
+
+- =hermes_skill_validate= は、指定した相対Skill IDの =SKILL.md= を読み取り専用で検証します。name、description、frontmatterの区切り、本文、サイズ制限などの違反を一覧で返します。確認は不要です。
+- =hermes_skill_create= は、Skill ID、description、本文から最小限のfrontmatterを生成し、検証してから =gptel-hermes-skills-directory/<skill-id>/SKILL.md= に新規作成します。既存ファイルを上書きせず、作成先は =gptel-hermes-skills-directory= 配下に限られ、確認が必要です。
+
+=gptel-hermes-enable= を実行すると、Skillを検証し、system promptのSkill索引を再生成します。全文本文は =hermes_skill_view= で必要時に読み込みます。個別の違反内容を確認する場合は =hermes_skill_validate= を使ってください。
+
+bundled / リポジトリの =skills/= はリポジトリのsource領域です。gptel-hermesのSkill作成toolから直接作成・上書きする対象ではありません。そこへSkillを追加・変更する場合は、明示的なリポジトリ編集として通常の編集、テスト、commitを行ってください。
+
 ** メモリディレクトリ
 
 =MEMORY.md= と =USER.md= は、デフォルトでは既存のHermes Agentと分離した以下から読み書きします。
@@ -136,6 +149,71 @@ hermes_skill_view("software-development/my-ponytail")
 - =user= → =USER.md=
 
 更新は検証後に atomic write されます。
+
+* Orgタスク管理
+
+Orgファイルを正本としたタスク管理を、専用のgptel toolで利用できます。
+=org-agenda-files= は現在のEmacs設定を正本とし、tool呼び出しごとに再評価します。設定されていない場合、ホームディレクトリや =~/org= を自動探索しません。
+
+** Orgファイルの設定
+
+少なくとも一つの既存ファイルを =org-agenda-files= に設定してください。
+
+#+begin_src emacs-lisp
+(setq org-agenda-files
+      (list "~/org/work.org"
+            "~/org/home.org"))
+#+end_src
+
+必要な場合だけ、=org-agenda-files= が空のときに =org-directory= をフォールバックとして使えます。
+
+#+begin_src emacs-lisp
+(setq gptel-hermes-org-directory-fallback t)
+#+end_src
+
+この設定も =org-directory= 以下を無条件に再帰探索するものではなく、Orgのagendaファイル規則に従います。書き込み対象は解決済みのagendaファイルに限られます。
+
+** Capture template
+
+captureを使う場合は、既存の =org-capture-templates= を設定してください。保存先をSKILLやtool呼び出し側で直接指定するのではなく、templateの設定を使います。
+
+#+begin_src emacs-lisp
+(setq org-capture-templates
+      '(("t" "Task" entry
+         (file+headline "work.org" "Tasks")
+         "* TODO %?")))
+#+end_src
+
+相対パスは =org-directory= 基準です。templateの保存先も =org-agenda-files= に含めてください。template keyが存在しない場合は、toolが利用可能なkeyを返します。capture template自体が未設定の場合は、設定方法を案内して終了します。
+
+** Toolの利用
+
+まず読み取り専用の =hermes_org_agenda= を呼び出します。
+
+#+begin_example
+hermes_org_agenda(view="open", limit=100)
+hermes_org_agenda(view="tag", tag="202607")
+#+end_example
+
+=open= は未完了、=all= は全状態、=tag= は指定タグのタスクを返します。返却値にはファイル、行番号、見出し、現在のTODO状態、タグ、優先度、期限・予定情報が含まれます。=YYYYMM= タグを付けておくと月次レビューに利用できます。
+
+状態変更とcaptureは確認付きの =hermes_org_task= を使います。
+
+#+begin_example
+hermes_org_task(action="todo",
+                file="/Users/me/org/work.org",
+                line=42,
+                heading="API仕様を確認",
+                keyword="DOIN")
+
+hermes_org_task(action="capture",
+                text="新しいタスクの内容",
+                template="t")
+#+end_example
+
+状態変更では、直前の =hermes_org_agenda= のfile・line・完全一致するheadingと、現在のEmacs設定にあるkeywordを渡します。staleな行や見出し、agenda外ファイル、不正なkeywordは拒否されます。一回の呼び出しで一タスクだけを変更し、=org-todo= と既存のログ・hookを利用します。一般のterminal/file toolでOrgファイルを書き換えず、必ずこの専用toolを使ってください。
+
+この機能はバックグラウンド監視、通知、cron/launchd、Google Calendar・Slack・Backlog等との同期を提供しません。カレンダーに既に登録された予定をOrgへ二重登録しないでください。
 
 * prompt の確認
 

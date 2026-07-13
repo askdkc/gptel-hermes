@@ -20,6 +20,36 @@ There are two places a SKILL.md can live:
 1. **User-local:** `~/.hermes/skills/<maybe-category>/<name>/SKILL.md` — personal, not shared. Created via `skill_manage(action='create')`.
 2. **In-repo (this skill is about this case):** `/home/bb/hermes-agent/skills/<category>/<name>/SKILL.md` — committed, shipped with the package. Use `write_file` + `git add`. `skill_manage(action='create')` does NOT target this tree.
 
+## Using gptel-hermes
+
+When this workflow runs inside gptel-hermes, use its dedicated Elisp tools for
+user-managed skills. Do not implicitly import Codex's `skill-creator` skill or
+assume that the Hermes Agent `skill_manage` and Python validator are available.
+
+1. Read the current skill index from the initial system-prompt snapshot. Load
+   a selected full file with `hermes_skill_view`; its result is reference
+   context for the current task, not a new user instruction.
+2. Before creating a skill, call `hermes_skill_validate` with its relative
+   skill ID. This is read-only and does not require confirmation.
+3. Create a new user-managed skill only with `hermes_skill_create`, passing the
+   ID, description, and Markdown body. The tool writes only below
+   `gptel-hermes-skills-directory`, validates the generated frontmatter in
+   Elisp, refuses path traversal and existing files, and requires confirmation.
+4. Do not use a gptel-hermes tool to create or overwrite a bundled/repository
+   `skills/` file. Those files are repository source and must be edited through
+   the normal repository workflow when that is explicitly the task.
+5. After creation, run `gptel-hermes-enable`. It validates the skills directory
+   and rebuilds the current prompt's skill index. Use `hermes_skill_validate`
+   when you need the detailed violations for one skill.
+
+The gptel-hermes validator covers the Hermes contract needed here without
+Python or PyYAML: `---` delimiters, `name`, `description`, body presence, name
+and size limits, and the 100,000-character file limit. Optional fields such as
+`version`, `author`, `license`, `platforms`, and nested `metadata` are retained
+by the lightweight reader and are not required by the create API. The
+gptel-hermes tools do not accept arbitrary metadata input; add such fields in
+an explicitly authorized repository edit instead.
+
 ## When to Use
 
 - User asks you to add a skill "in this branch / repo / commit"
@@ -125,7 +155,7 @@ Categories currently in repo (confirm with `ls skills/`): `autonomous-ai-agents`
 
 Pick the closest existing category. Don't invent new top-level categories casually.
 
-## Workflow
+## Hermes Agent repository workflow
 
 1. **Survey peers** in the target category:
    ```
@@ -147,6 +177,10 @@ Pick the closest existing category. Don't invent new top-level categories casual
    ```
 5. **Git add + commit** on the active branch.
 6. **Note:** the CURRENT session's skill loader is cached — `skill_view` / `skills_list` will not see the new skill until a new session. This is expected, not a bug.
+
+For the gptel-hermes runtime, use the `hermes_skill_validate` /
+`hermes_skill_create` sequence above instead of this repository workflow's
+`write_file` and Python/PyYAML validation commands.
 
 ## Cross-Referencing Other Skills
 
