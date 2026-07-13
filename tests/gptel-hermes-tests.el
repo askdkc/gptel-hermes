@@ -29,6 +29,14 @@
       (insert "must not be copied\n"))
     root))
 
+(ert-deftest gptel-hermes-default-home-is-isolated-from-hermes-agent ()
+  (let ((gptel-hermes-home nil)
+        (process-environment (copy-sequence process-environment)))
+    (setenv "HERMES_HOME" "/tmp/existing-hermes-home")
+    (should (equal (file-name-as-directory
+                    (expand-file-name "~/.gptel-hermes"))
+                   (gptel-hermes--home)))))
+
 (ert-deftest gptel-hermes-prompt-is-index-plus-memory-not-skill-body ()
   (let ((home (gptel-hermes-test--fixture)))
     (unwind-protect
@@ -111,6 +119,24 @@
                    (expand-file-name ".gptel-hermes-bundled-skills" destination))))
       (delete-directory source t)
       (delete-directory destination t))))
+
+(ert-deftest gptel-hermes-sync-creates-missing-destination ()
+  (let* ((source (gptel-hermes-test--bundled-skills-fixture))
+         (destination-parent (make-temp-file "gptel-hermes-destination-" t))
+         (destination (expand-file-name "profiles/main/skills"
+                                       destination-parent)))
+    (delete-directory destination-parent t)
+    (unwind-protect
+        (let ((gptel-hermes--bundled-skills-directory source)
+              (gptel-hermes-skills-directory destination))
+          (gptel-hermes--sync-bundled-skills)
+          (should (file-exists-p
+                   (expand-file-name "category/demo/SKILL.md" destination)))
+          (should (file-exists-p
+                   (expand-file-name ".gptel-hermes-bundled-skills" destination))))
+      (delete-directory source t)
+      (when (file-directory-p destination-parent)
+        (delete-directory destination-parent t)))))
 
 (ert-deftest gptel-hermes-sync-preserves-existing-skill ()
   (let* ((source (gptel-hermes-test--bundled-skills-fixture))

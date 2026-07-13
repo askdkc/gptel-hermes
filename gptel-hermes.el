@@ -31,12 +31,19 @@
   "Directory containing the skills bundled with gptel-hermes.")
 
 (defcustom gptel-hermes-skills-directory
-  gptel-hermes--bundled-skills-directory
-  "Directory containing Hermes skill directories."
+  (expand-file-name "profiles/main/skills" "~/.gptel-hermes")
+  "Directory containing the user-managed Hermes skill directories.
+
+The bundled skills are copied here on first enable when this directory is
+outside the package."
   :type 'directory)
 
-(defcustom gptel-hermes-home nil
-  "Hermes home directory.  NIL follows HERMES_HOME or ~/.hermes."
+(defcustom gptel-hermes-home
+  (expand-file-name "~/.gptel-hermes")
+  "Directory used for gptel-hermes persistent memory.
+
+The default is ~/.gptel-hermes.  HERMES_HOME is not used implicitly, so
+gptel-hermes does not share memory with a separate Hermes Agent installation."
   :type '(choice (const nil) directory))
 
 (defconst gptel-hermes--excluded-directories
@@ -48,8 +55,7 @@
 (defun gptel-hermes--home ()
   (file-name-as-directory
    (expand-file-name (or gptel-hermes-home
-                         (getenv "HERMES_HOME")
-                         "~/.hermes"))))
+                         "~/.gptel-hermes"))))
 
 (defun gptel-hermes--skills-root ()
   (file-name-as-directory (expand-file-name gptel-hermes-skills-directory)))
