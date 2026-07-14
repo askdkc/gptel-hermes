@@ -323,6 +323,11 @@
             (should (string-match-p "100000" too-large))))
       (delete-directory root t))))
 
+(ert-deftest gptel-hermes-bundled-skills-pass-validation ()
+  (let ((gptel-hermes-skills-directory
+         gptel-hermes--bundled-skills-directory))
+    (should-not (gptel-hermes--skill-validation-failures))))
+
 (ert-deftest gptel-hermes-skill-validation-rejects-unsafe-relative-ids ()
   (let ((root (make-temp-file "gptel-hermes-skill-" t)))
     (unwind-protect
@@ -562,6 +567,48 @@
       (delete-directory source t)
       (delete-directory destination t))))
 
+(ert-deftest gptel-hermes-reinstall-skills-overwrites-bundled-files-only ()
+  (let* ((source (gptel-hermes-test--bundled-skills-fixture))
+         (destination (make-temp-file "gptel-hermes-destination-" t))
+         (destination-skill
+          (expand-file-name "category/demo/SKILL.md" destination))
+         (custom-skill
+          (expand-file-name "custom/own/SKILL.md" destination))
+         (marker
+          (expand-file-name ".gptel-hermes-bundled-skills" destination)))
+    (unwind-protect
+        (progn
+          (make-directory (file-name-directory destination-skill) t)
+          (make-directory (file-name-directory custom-skill) t)
+          (with-temp-file destination-skill (insert "user override\n"))
+          (with-temp-file custom-skill (insert "custom skill\n"))
+          (with-temp-file marker)
+          (let ((gptel-hermes--bundled-skills-directory source)
+                (gptel-hermes-skills-directory destination))
+            (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) nil)))
+              (should-error (gptel-hermes-reinstall-skills)
+                            :type 'user-error))
+            (should (equal "user override\n"
+                           (gptel-hermes--read destination-skill)))
+            (let (prompt)
+              (let ((result
+                     (cl-letf (((symbol-function 'yes-or-no-p)
+                                (lambda (question)
+                                  (setq prompt question)
+                                  t)))
+                       (gptel-hermes-reinstall-skills))))
+                (should (eq 'reinstalled (plist-get result :status)))
+                (should (= 1 (plist-get result :overwritten)))
+                (should (= 0 (plist-get result :copied))))
+              (should (string-match-p (regexp-quote destination) prompt)))
+            (should (equal "bundled demo skill\n"
+                           (gptel-hermes--read destination-skill)))
+            (should (equal "custom skill\n"
+                           (gptel-hermes--read custom-skill)))
+            (should (file-exists-p marker))))
+      (delete-directory source t)
+      (delete-directory destination t))))
+
 (ert-deftest gptel-hermes-sync-marker-prevents-a-second-copy ()
   (let* ((source (gptel-hermes-test--bundled-skills-fixture))
          (destination (make-temp-file "gptel-hermes-destination-" t))
@@ -599,7 +646,8 @@
           (let ((result (gptel-hermes--sync-bundled-skills)))
             (should (eq 'bundled (plist-get result :status)))
             (should-not (file-exists-p
-                         (expand-file-name ".gptel-hermes-bundled-skills" source)))))
+                         (expand-file-name ".gptel-hermes-bundled-skills" source))))
+          (should-error (gptel-hermes-reinstall-skills) :type 'user-error))
       (delete-directory source t))))
 
 (provide 'gptel-hermes-tests)

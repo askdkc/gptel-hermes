@@ -1349,55 +1349,26 @@ The `S` column type auto-aligns on the decimal point. Headers in `{}` escape the
 
 ### Subfigures
 
-Standard pattern for side-by-side figures:
-
-```latex
-\begin{figure}[t]
-  \centering
-  \begin{subfigure}[b]{0.48\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{fig_results_a.pdf}
-    \caption{Results on Dataset A.}
-    \label{fig:results-a}
-  \end{subfigure}
-  \hfill
-  \begin{subfigure}[b]{0.48\textwidth}
-    \centering
-    \includegraphics[width=\textwidth]{fig_results_b.pdf}
-    \caption{Results on Dataset B.}
-    \label{fig:results-b}
-  \end{subfigure}
-  \caption{Comparison of our method across two datasets. (a) shows the scaling
-  behavior and (b) shows the ablation results. Both use 5 random seeds.}
-  \label{fig:results}
-\end{figure}
-```
-
-Use `\cref{fig:results}` → "Figure 1", `\cref{fig:results-a}` → "Figure 1a".
+Use `subcaption` with two `0.48\textwidth` panels separated by `\hfill`.
+Give each panel its own caption and label plus a self-contained parent caption,
+then reference both parent and panels with `cleveref`. Verify that the venue
+template permits `subcaption` before adding it.
 
 ### Pseudocode with algorithm2e
 
+Use pseudocode for the paper's core algorithm only. State inputs, outputs,
+termination, and the returned value; leave implementation details in prose or
+the appendix.
+
 ```latex
 \begin{algorithm}[t]
-\caption{Iterative Refinement with Judge Panel}
+\caption{Iterative Refinement}
 \label{alg:method}
-\KwIn{Task $T$, model $M$, judges $J_1 \ldots J_n$, convergence threshold $k$}
-\KwOut{Final output $A^*$}
-$A \gets M(T)$ \tcp*{Initial generation}
-$\text{streak} \gets 0$\;
-\While{$\text{streak} < k$}{
-  $C \gets \text{Critic}(A, T)$ \tcp*{Identify weaknesses}
-  $B \gets M(T, C)$ \tcp*{Revised version addressing critique}
-  $AB \gets \text{Synthesize}(A, B)$ \tcp*{Merge best elements}
-  \ForEach{judge $J_i$}{
-    $\text{rank}_i \gets J_i(\text{shuffle}(A, B, AB))$ \tcp*{Blind ranking}
-  }
-  $\text{winner} \gets \text{BordaCount}(\text{ranks})$\;
-  \eIf{$\text{winner} = A$}{
-    $\text{streak} \gets \text{streak} + 1$\;
-  }{
-    $A \gets \text{winner}$; $\text{streak} \gets 0$\;
-  }
+\KwIn{Task $T$, convergence threshold $k$}
+\KwOut{Answer $A$}
+$A \gets \operatorname{Generate}(T)$\;
+\While{not converged for $k$ rounds}{
+  $A \gets \operatorname{Revise}(A, \operatorname{Critique}(A,T))$\;
 }
 \Return{$A$}\;
 \end{algorithm}
@@ -1405,80 +1376,11 @@ $\text{streak} \gets 0$\;
 
 ### TikZ Diagram Patterns
 
-TikZ is the standard for method diagrams in ML papers. Common patterns:
-
-**Pipeline/Flow Diagram** (most common in ML papers):
-
-```latex
-\begin{figure}[t]
-\centering
-\begin{tikzpicture}[
-  node distance=1.8cm,
-  box/.style={rectangle, draw, rounded corners, minimum height=1cm, 
-              minimum width=2cm, align=center, font=\small},
-  arrow/.style={-{Stealth[length=3mm]}, thick},
-]
-  \node[box, fill=okcyan!20] (input) {Input\\$x$};
-  \node[box, fill=okblue!20, right of=input] (encoder) {Encoder\\$f_\theta$};
-  \node[box, fill=okgreen!20, right of=encoder] (latent) {Latent\\$z$};
-  \node[box, fill=okorange!20, right of=latent] (decoder) {Decoder\\$g_\phi$};
-  \node[box, fill=okred!20, right of=decoder] (output) {Output\\$\hat{x}$};
-  
-  \draw[arrow] (input) -- (encoder);
-  \draw[arrow] (encoder) -- (latent);
-  \draw[arrow] (latent) -- (decoder);
-  \draw[arrow] (decoder) -- (output);
-\end{tikzpicture}
-\caption{Architecture overview. The encoder maps input $x$ to latent 
-representation $z$, which the decoder reconstructs.}
-\label{fig:architecture}
-\end{figure}
-```
-
-**Comparison/Matrix Diagram** (for showing method variants):
-
-```latex
-\begin{tikzpicture}[
-  cell/.style={rectangle, draw, minimum width=2.5cm, minimum height=1cm, 
-               align=center, font=\small},
-  header/.style={cell, fill=gray!20, font=\small\bfseries},
-]
-  % Headers
-  \node[header] at (0, 0) {Method};
-  \node[header] at (3, 0) {Converges?};
-  \node[header] at (6, 0) {Quality?};
-  % Rows
-  \node[cell] at (0, -1) {Single Pass};
-  \node[cell, fill=okgreen!15] at (3, -1) {N/A};
-  \node[cell, fill=okorange!15] at (6, -1) {Baseline};
-  \node[cell] at (0, -2) {Critique+Revise};
-  \node[cell, fill=okred!15] at (3, -2) {No};
-  \node[cell, fill=okred!15] at (6, -2) {Degrades};
-  \node[cell] at (0, -3) {Ours};
-  \node[cell, fill=okgreen!15] at (3, -3) {Yes ($k$=2)};
-  \node[cell, fill=okgreen!15] at (6, -3) {Improves};
-\end{tikzpicture}
-```
-
-**Iterative Loop Diagram** (for methods with feedback):
-
-```latex
-\begin{tikzpicture}[
-  node distance=2cm,
-  box/.style={rectangle, draw, rounded corners, minimum height=0.8cm, 
-              minimum width=1.8cm, align=center, font=\small},
-  arrow/.style={-{Stealth[length=3mm]}, thick},
-  label/.style={font=\scriptsize, midway, above},
-]
-  \node[box, fill=okblue!20] (gen) {Generator};
-  \node[box, fill=okred!20, right=2.5cm of gen] (critic) {Critic};
-  \node[box, fill=okgreen!20, below=1.5cm of $(gen)!0.5!(critic)$] (judge) {Judge Panel};
-  
-  \draw[arrow] (gen) -- node[label] {output $A$} (critic);
-  \draw[arrow] (critic) -- node[label, right] {critique $C$} (judge);
-  \draw[arrow] (judge) -| node[label, left, pos=0.3] {winner} (gen);
-\end{tikzpicture}
-```
+Use TikZ when a source-controlled vector diagram justifies its maintenance
+cost. Define reusable `box` and `arrow` styles with `positioning` and
+`arrows.meta`; prefer one left-to-right pipeline. For comparisons or feedback
+loops, label edges, use the colorblind-safe palette above, verify readability
+at final column width, and make the caption self-contained.
 
 ### latexdiff for Revision Tracking
 

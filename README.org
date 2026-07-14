@@ -88,6 +88,14 @@ M-x gptel-hermes-enable
 
 このリポジトリの bundled =skills/= には基本スキルセットを配置済みです。bundled =skills/= 自体を指定した場合は、自己コピーを行いません。
 
+パッケージ更新後などにbundled =SKILL.md= を明示的に上書きする場合:
+
+#+begin_src emacs-lisp
+M-x gptel-hermes-reinstall-skills
+#+end_src
+
+実行前に確認を求め、bundledと同じ相対パスの =SKILL.md= だけを上書きします。bundledに存在しないユーザー独自Skillは削除しません。既存のgptelバッファでSkill索引を更新する場合は、続けて =M-x gptel-hermes-enable= を実行してください。
+
 ** Skillの作成と検証
 
 - =hermes_skill_validate= は、指定した相対Skill IDの =SKILL.md= を読み取り専用で検証します。name、description、frontmatterの区切り、本文、サイズ制限などの違反を一覧で返します。確認は不要です。
@@ -257,6 +265,8 @@ emacs --batch -L /path/to/gptel -L . -L tests \
 - 同期済みディレクトリでの再コピー抑止
 - 同期途中のエラー時に完了マーカーを作成しない
 - bundled =skills/= 自体を指定した場合の自己コピー回避
+- bundled =SKILL.md= 全件がvalidationを通ること
+- bundled =SKILL.md= の確認付き再インストールとユーザー独自Skillの保持
 
 * 現在の未実装機能
 
