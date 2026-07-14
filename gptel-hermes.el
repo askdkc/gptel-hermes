@@ -1526,7 +1526,6 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
     (gptel-hermes-runtime-initialize-workspace)
     (setq gptel-hermes--base-system-prompt gptel-system-prompt
           gptel-hermes--enabled-p t))
-  (gptel-hermes-runtime-initialize-workspace)
   (let ((validation-failures (gptel-hermes--skill-validation-failures)))
     (setq-local gptel-system-prompt
                 (concat (gptel-hermes--prompt) "\n"

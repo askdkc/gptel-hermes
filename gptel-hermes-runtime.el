@@ -698,6 +698,8 @@ directly instead."
                 (set-process-filter process #'gptel-hermes-runtime--terminal-filter-stdout)
                 (set-process-sentinel process #'gptel-hermes-runtime--terminal-sentinel)
                 (set-process-query-on-exit-flag process nil)
+                ;; No stdin argument is exposed.  Close the pipe so readers
+                ;; exit instead of waiting until the timeout.
                 (process-send-eof process)
                 (gptel-hermes-runtime--terminal-set-state
                  process
@@ -813,7 +815,7 @@ directly instead."
   (gptel-make-tool
    :name "hermes_terminal"
    :function #'gptel-hermes-terminal
-   :description "Run an executable asynchronously with an argv array in the Hermes workspace. This is not an OS sandbox; confirmed programs can access the network and absolute paths."
+   :description "Run an executable asynchronously with an argv array in the Hermes workspace. Standard input is closed. This is not an OS sandbox; confirmed programs can access the network and absolute paths."
    :args (list '(:name "program" :type string :description "Executable name or path")
                '(:name "arguments" :type array :items (:type string)
                  :description "Argument strings; no shell is inserted")
