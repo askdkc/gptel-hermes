@@ -23,6 +23,7 @@
 (require 'cl-lib)
 (require 'subr-x)
 (require 'gptel)
+(require 'gptel-hermes-runtime)
 (require 'org)
 (require 'org-capture)
 (require 'org-element)
@@ -41,10 +42,10 @@
 
 (defcustom gptel-hermes-skills-directory
   (expand-file-name "profiles/main/skills" "~/.gptel-hermes")
-  "Directory containing the user-managed Hermes skill directories.
+  "Directory containing user-managed Hermes skill overlays.
 
-The bundled skills are copied here on first enable when this directory is
-outside the package."
+Bundled skills remain read-only and are used as a fallback when no overlay
+exists."
   :type 'directory
   :group 'gptel-hermes)
 
@@ -110,6 +111,12 @@ gptel-hermes does not share memory with a separate Hermes Agent installation."
         (insert-file-contents path)
         (buffer-string))
     ""))
+
+(defun gptel-hermes--file-sha256 (path)
+  "Return the byte SHA-256 of regular PATH."
+  (with-temp-buffer
+    (insert-file-contents-literally path)
+    (secure-hash 'sha256 (current-buffer))))
 
 (defun gptel-hermes--frontmatter-unquote (value)
   "Return the useful scalar value from a small YAML-like VALUE.
@@ -224,15 +231,35 @@ This is the common reader used by both the skill index and validation."
   (cl-some (lambda (part) (member part gptel-hermes--excluded-directories))
            (split-string relative "/" t)))
 
-(defun gptel-hermes--skill-files (&optional root)
-  "Return indexed SKILL.md files below ROOT or the configured root."
-  (let ((root (file-name-as-directory
-               (expand-file-name (or root (gptel-hermes--skills-root))))))
+(defun gptel-hermes--skill-files-under-root (root)
+  "Return indexed SKILL.md files below ROOT."
+  (let ((root (file-name-as-directory (expand-file-name root))))
     (when (file-directory-p root)
       (cl-remove-if
        (lambda (path)
-         (gptel-hermes--excluded-path-p (file-relative-name path root)))
+         (or (file-symlink-p path)
+             (not (gptel-hermes--path-under-directory-p path root))
+             (gptel-hermes--excluded-path-p (file-relative-name path root))))
        (directory-files-recursively root "\\`SKILL\\.md\\'" t)))))
+
+(defun gptel-hermes--skill-files (&optional root)
+  "Return effective indexed SKILL.md files below ROOT or both skill roots.
+
+When ROOT is supplied, only that root is searched.  Without ROOT, user
+overlays win over bundled files with the same relative skill ID."
+  (if root
+      (gptel-hermes--skill-files-under-root root)
+    (let (result seen)
+      (dolist (candidate (list (gptel-hermes--skills-root)
+                               (gptel-hermes--bundled-skills-root)))
+        (dolist (path (gptel-hermes--skill-files-under-root candidate))
+          (let ((id (file-relative-name
+                     (file-name-directory path)
+                     (file-name-as-directory (expand-file-name candidate)))))
+            (unless (member id seen)
+              (push id seen)
+              (push path result)))))
+      (nreverse result))))
 
 (defun gptel-hermes--sync-bundled-skills (&optional overwrite)
   "Copy bundled SKILL.md files to the configured skills directory.
@@ -290,7 +317,7 @@ can be retried."
 
 ;;;###autoload
 (defun gptel-hermes-reinstall-skills ()
-  "Overwrite configured copies of bundled SKILL.md files.
+  "Deprecated: overwrite configured copies of bundled SKILL.md files.
 
 User-created skills whose relative paths are not present in the bundle are
 preserved.  The command asks for confirmation and refuses to overwrite the
@@ -309,15 +336,64 @@ package's bundled source directory or a symlinked destination file."
         (user-error "Skill reinstallation canceled")))
     (gptel-hermes--sync-bundled-skills t)))
 
+(defun gptel-hermes--skill-root-for-path (path)
+  "Return the effective skill root containing PATH."
+  (cl-find-if
+   (lambda (root)
+     (and (file-directory-p root)
+          (gptel-hermes--path-under-directory-p path root)))
+   (list (gptel-hermes--skills-root) (gptel-hermes--bundled-skills-root))))
+
+(defun gptel-hermes--user-skill-path (skill-id)
+  "Return the user-overlay SKILL.md path for SKILL-ID."
+  (expand-file-name (concat skill-id "/SKILL.md")
+                    (gptel-hermes--skills-root)))
+
+(defun gptel-hermes--bundled-skill-path (skill-id)
+  "Return the bundled SKILL.md path for SKILL-ID."
+  (expand-file-name (concat skill-id "/SKILL.md")
+                    (gptel-hermes--bundled-skills-root)))
+
+(defun gptel-hermes--skill-origin-path (skill-id)
+  "Return the origin metadata path for user SKILL-ID."
+  (expand-file-name ".gptel-hermes-origin"
+                    (file-name-directory (gptel-hermes--user-skill-path skill-id))))
+
+(defun gptel-hermes--skill-upstream-changed-p (skill-id)
+  "Return non-nil when bundled SKILL-ID changed since the user update."
+  (let* ((origin (gptel-hermes--skill-origin-path skill-id))
+         (bundled (gptel-hermes--bundled-skill-path skill-id))
+         (recorded (and (file-readable-p origin)
+                        (not (file-symlink-p origin))
+                        (with-temp-buffer
+                          (insert-file-contents origin)
+                          (when (re-search-forward
+                                 "^bundled_sha256=\\([[:xdigit:]]+\\)$" nil t)
+                            (match-string 1))))))
+    (and recorded
+         (or (not (file-regular-p bundled))
+             (not (string= (downcase recorded)
+                           (downcase (gptel-hermes--file-sha256 bundled))))))))
+
 (defun gptel-hermes--skill-id (path)
-  "Return the configured-root-relative skill ID for PATH."
+  "Return the effective-root-relative skill ID for PATH."
+  (let ((root (or (gptel-hermes--skill-root-for-path path)
+                  (gptel-hermes--skills-root))))
   (file-name-sans-extension
    (directory-file-name
-    (file-relative-name (file-name-directory path) (gptel-hermes--skills-root)))))
+    (file-relative-name (file-name-directory path) root)))))
 
 (defun gptel-hermes--skill-entry (path)
   "Return the indexed skill metadata read from PATH."
   (let* ((id (gptel-hermes--skill-id path))
+         (root (gptel-hermes--skill-root-for-path path))
+         (bundled-root (gptel-hermes--bundled-skills-root))
+         (source (if (gptel-hermes--same-directory-p root bundled-root)
+                     'bundled
+                   (if (gptel-hermes--same-directory-p root
+                                                         (gptel-hermes--skills-root))
+                       'user-overlay
+                     'bundled)))
          (meta (gptel-hermes--frontmatter (gptel-hermes--read path)))
          (parts (split-string id "/" t)))
     (list :id id
@@ -325,7 +401,10 @@ package's bundled source directory or a symlinked destination file."
           :description (or (alist-get "description" meta nil nil #'string=) "")
           :category (or (alist-get "category" meta nil nil #'string=)
                         (or (car parts) "general"))
-          :path path)))
+          :path path
+          :source source
+          :upstream-changed (and (eq source 'user-overlay)
+                                  (gptel-hermes--skill-upstream-changed-p id)))))
 
 (defun gptel-hermes--skill-entries ()
   "Return all configured skill entries sorted by ID."
@@ -357,12 +436,42 @@ package's bundled source directory or a symlinked destination file."
           ((cdr matches) (error "Ambiguous skill name: %s" name))
           (t (car matches)))))
 
-(defun gptel-hermes-skill-view (name)
-  "Return the SKILL.md selected by NAME as a model-facing tool result."
+(defun gptel-hermes-skill-view (name &optional resource)
+  "Return NAME, or its relative RESOURCE, as a model-facing tool result."
   (let* ((entry (gptel-hermes--find-skill name))
-         (path (plist-get entry :path)))
-    (format "Hermes skill: %s\nSource: skills/%s/SKILL.md\n\n%s"
-            (plist-get entry :name) (plist-get entry :id) (gptel-hermes--read path))))
+         (skill-id (plist-get entry :id))
+         (skill-path (plist-get entry :path))
+         (path (if resource
+                   (or (gptel-hermes--skill-resource-path skill-id resource)
+                       (error "Skill resource not found: %s" resource))
+                 skill-path))
+         (resource-source
+          (cond
+           ((and resource
+                 (gptel-hermes--path-under-directory-p
+                  path (gptel-hermes--skills-root)))
+            "user-overlay")
+           ((and resource
+                 (gptel-hermes--path-under-directory-p
+                  path (gptel-hermes--bundled-skills-root)))
+            "bundled")
+           (t (if (eq (plist-get entry :source) 'bundled)
+                  "bundled" "user-overlay"))))
+         (source-label (if resource
+                           (format "skills/%s/%s" skill-id resource)
+                         (format "skills/%s/SKILL.md" skill-id))))
+    (format (concat "Hermes skill: %s\nSkill ID: %s\n"
+                    "Source: %s\n"
+                    "Effective source: %s\n"
+                    "Effective SHA-256: %s\n"
+                    "Bundled upstream changed: %s\n\n%s")
+            (plist-get entry :name)
+            skill-id
+            source-label
+            resource-source
+            (gptel-hermes--file-sha256 path)
+            (if (plist-get entry :upstream-changed) "yes" "no")
+            (gptel-hermes--read path))))
 
 (defun gptel-hermes--skill-id-errors (skill-id)
   "Return safety/format errors for SKILL-ID.
@@ -501,7 +610,9 @@ skill directory."
                 (mapconcat (lambda (error-message)
                              (concat "- " error-message))
                            id-errors "\n"))
-      (let ((path (gptel-hermes--skill-path skill-id)))
+      (let* ((entry (gptel-hermes--effective-skill-entry-by-id skill-id))
+             (path (or (and entry (plist-get entry :path))
+                       (gptel-hermes--skill-path skill-id))))
         (cond
          ((not (file-exists-p path))
           (format "Skill validation failed.\nSkill ID: %s\nErrors:\n- SKILL.md does not exist: %s"
@@ -591,8 +702,10 @@ being enabled."
     (make-directory destination-directory t)
     (when (or (file-exists-p destination) (file-symlink-p destination))
       (error "Skill already exists: %s" destination))
-    (let ((temporary (make-temp-file "hermes-skill-" nil ".tmp"
-                                    destination-directory)))
+    (let ((temporary
+           (make-temp-file (expand-file-name "hermes-skill-"
+                                             destination-directory)
+                           nil ".tmp")))
       (unwind-protect
           (progn
             (with-temp-file temporary
@@ -648,6 +761,210 @@ the same Elisp validator exposed through `gptel-hermes-skill-validate'."
                       "Body length: %d characters\n"
                       "Index: refreshed")
               skill-id path name description (length body)))))
+
+(defun gptel-hermes--atomic-user-skill-write (path content &optional create-only)
+  "Atomically write user skill PATH with CONTENT.
+
+When CREATE-ONLY is non-nil, refuse an existing destination."
+  (let* ((root (file-name-as-directory
+                (expand-file-name (gptel-hermes--skills-root))))
+         (bundled (file-truename (gptel-hermes--bundled-skills-root))))
+    (make-directory root t)
+    (setq root (file-truename root))
+    (unless (gptel-hermes--path-under-directory-p path root)
+      (error "Skill destination escapes the user skill directory: %s" path))
+    (when (gptel-hermes--path-under-directory-p path bundled)
+      (error "Bundled skills are read-only: %s" path))
+    (when (file-symlink-p path)
+      (error "Refusing to replace a symlinked skill: %s" path))
+    (when (and create-only (or (file-exists-p path) (file-symlink-p path)))
+      (error "Skill already exists: %s" path))
+    (make-directory (file-name-directory path) t)
+    (let ((temporary
+           (make-temp-file (expand-file-name "hermes-skill-"
+                                             (file-name-directory path))
+                           nil ".tmp")))
+      (unwind-protect
+          (progn
+            (let ((coding-system-for-write 'utf-8-unix))
+              (write-region content nil temporary nil 'silent))
+            (rename-file temporary path (not create-only))
+            (setq temporary nil))
+        (when (and temporary (file-exists-p temporary))
+          (delete-file temporary))))))
+
+(defun gptel-hermes--effective-skill-entry-by-id (skill-id)
+  "Return the effective skill entry for exact SKILL-ID."
+  (cl-find-if (lambda (entry) (string= skill-id (plist-get entry :id)))
+              (gptel-hermes--skill-entries)))
+
+(defun gptel-hermes--skill-resource-path (skill-id resource)
+  "Resolve relative RESOURCE for SKILL-ID using user then bundled overlay."
+  (let ((id-errors (gptel-hermes--skill-id-errors skill-id)))
+    (when id-errors
+      (error "Invalid skill ID: %s" (mapconcat #'identity id-errors "; "))))
+  (unless (and (stringp resource) (not (string-empty-p resource)))
+    (error "Skill resource must be a non-empty relative path"))
+  (when (or (file-name-absolute-p resource)
+            (member ".." (split-string resource "/" t)))
+    (error "Skill resource must stay below its skill directory"))
+  (let* ((user-root (gptel-hermes--skills-root))
+         (bundled-root (gptel-hermes--bundled-skills-root))
+         (user-directory (file-name-directory (gptel-hermes--user-skill-path skill-id)))
+         (bundled-directory (file-name-directory (gptel-hermes--bundled-skill-path skill-id)))
+         (user-path (expand-file-name resource user-directory))
+         (bundled-path (expand-file-name resource bundled-directory)))
+    (cond
+     ((and (file-regular-p user-path)
+           (not (file-symlink-p user-path))
+           (file-directory-p user-directory)
+           (gptel-hermes--path-under-directory-p user-path user-directory)
+           (gptel-hermes--path-under-directory-p user-path user-root))
+      user-path)
+     ((and (file-regular-p bundled-path)
+           (not (file-symlink-p bundled-path))
+           (file-directory-p bundled-directory)
+           (gptel-hermes--path-under-directory-p bundled-path bundled-directory)
+           (gptel-hermes--path-under-directory-p bundled-path bundled-root))
+      bundled-path)
+     (t nil))))
+
+(defun gptel-hermes-skill-update (skill-id content expected-sha256)
+  "Copy-on-write update of SKILL-ID with CONTENT after checking EXPECTED-SHA256."
+  (let ((id-errors (gptel-hermes--skill-id-errors skill-id)))
+    (when id-errors
+      (error "Invalid skill ID: %s" (mapconcat #'identity id-errors "; "))))
+  (unless (stringp content)
+    (error "Skill content must be a string"))
+  (unless (and (stringp expected-sha256) (not (string-empty-p expected-sha256)))
+    (error "Expected SHA-256 is required"))
+  (when (gptel-hermes--same-directory-p (gptel-hermes--skills-root)
+                                        (gptel-hermes--bundled-skills-root))
+    (error "Skill updates require a separate user overlay directory"))
+  (let* ((user-path (gptel-hermes--user-skill-path skill-id))
+         (bundled-path (gptel-hermes--bundled-skill-path skill-id))
+         (origin (gptel-hermes--skill-origin-path skill-id)))
+    (when (or (file-symlink-p user-path) (file-symlink-p origin))
+      (error "Skill update refuses symlinked overlay metadata: %s" skill-id))
+    (let* ((effective-path (cond ((and (file-regular-p user-path)
+                                       (not (file-symlink-p user-path)))
+                                  user-path)
+                                 ((and (file-regular-p bundled-path)
+                                       (not (file-symlink-p bundled-path)))
+                                  bundled-path)
+                                 (t (error "Skill not found: %s" skill-id))))
+           (current-sha (gptel-hermes--file-sha256 effective-path))
+           (validation (gptel-hermes--validate-skill-content content)))
+      (unless (string= (downcase expected-sha256) (downcase current-sha))
+        (error "Stale SHA-256 for skill %s" skill-id))
+      (unless (plist-get validation :valid)
+        (error "Updated skill is invalid: %s"
+               (mapconcat #'identity (plist-get validation :errors) "; ")))
+      (gptel-hermes--atomic-user-skill-write user-path content)
+      (unless (file-exists-p origin)
+        (when (file-regular-p bundled-path)
+          (gptel-hermes--atomic-user-skill-write
+           origin
+           (format "bundled_sha256=%s\n" (gptel-hermes--file-sha256 bundled-path)))))
+      (ignore (gptel-hermes--skill-entries))
+      (format (concat "Skill update complete\n"
+                      "Skill ID: %s\nSource: user-overlay\n"
+                      "Effective SHA-256: %s\nIndex: refreshed")
+              skill-id (gptel-hermes--file-sha256 user-path)))))
+
+(defun gptel-hermes-skill-customize (skill-id)
+  "Copy the complete bundled directory for SKILL-ID into user overlay."
+  (interactive (list (read-string "Skill ID: ")))
+  (let ((id-errors (gptel-hermes--skill-id-errors skill-id)))
+    (when id-errors
+      (user-error "Invalid skill ID: %s" (mapconcat #'identity id-errors "; "))))
+  (when (gptel-hermes--same-directory-p (gptel-hermes--skills-root)
+                                        (gptel-hermes--bundled-skills-root))
+    (user-error "Customization requires a separate user overlay directory"))
+  (let* ((source (file-name-directory (gptel-hermes--bundled-skill-path skill-id)))
+         (bundled-skill (expand-file-name "SKILL.md" source))
+         (destination (file-name-as-directory
+                       (file-name-directory (gptel-hermes--user-skill-path skill-id)))))
+    (unless (and (file-directory-p source)
+                 (file-regular-p bundled-skill)
+                 (not (file-symlink-p bundled-skill))
+                 (gptel-hermes--path-under-directory-p
+                  source (gptel-hermes--bundled-skills-root)))
+      (user-error "Bundled skill directory does not exist: %s" skill-id))
+    (when (or (file-exists-p destination) (file-symlink-p destination))
+      (user-error "User skill directory already exists: %s" destination))
+    (unless (gptel-hermes--path-under-directory-p
+             destination (gptel-hermes--skills-root))
+      (user-error "User skill directory escapes configured overlay: %s"
+                  destination))
+    (copy-directory source destination nil t t)
+    (gptel-hermes--atomic-user-skill-write
+     (expand-file-name ".gptel-hermes-origin" destination)
+     (format "bundled_sha256=%s\n"
+             (gptel-hermes--file-sha256
+              bundled-skill)))
+    (format "Skill customization complete\nSkill ID: %s\nSource: user-overlay"
+            skill-id)))
+
+(defun gptel-hermes-skill-diff-bundled (skill-id)
+  "Open an Emacs diff for SKILL-ID user overlay and bundled source."
+  (interactive (list (read-string "Skill ID: ")))
+  (let ((user-path (gptel-hermes--user-skill-path skill-id))
+        (bundled-path (gptel-hermes--bundled-skill-path skill-id)))
+    (unless (and (file-regular-p user-path)
+                 (not (file-symlink-p user-path))
+                 (file-regular-p bundled-path)
+                 (not (file-symlink-p bundled-path)))
+      (user-error "Both user and bundled SKILL.md files are required"))
+    (unless (gptel-hermes--skill-upstream-changed-p skill-id)
+      (user-error "Bundled source has not changed for %s" skill-id))
+    (diff user-path bundled-path nil)))
+
+(defun gptel-hermes--delete-empty-parent-directories (directory root)
+  "Delete empty DIRECTORY parents up to ROOT, excluding ROOT."
+  (let ((root (file-name-as-directory (file-truename root)))
+        (directory (file-name-as-directory (file-truename directory))))
+    (while (and (not (string= directory root))
+                (file-directory-p directory)
+                (cl-every (lambda (entry) (member entry '("." "..")))
+                          (directory-files directory nil nil t)))
+      (delete-directory directory)
+      (setq directory (file-name-as-directory
+                       (file-name-directory (directory-file-name directory)))))))
+
+;;;###autoload
+(defun gptel-hermes-migrate-skill-overlay ()
+  "Remove only byte-identical legacy bundled skill copies."
+  (interactive)
+  (let* ((root (gptel-hermes--skills-root))
+         (marker (gptel-hermes--bundled-skills-marker-path root))
+         (identical nil))
+    (when (gptel-hermes--same-directory-p root
+                                          (gptel-hermes--bundled-skills-root))
+      (user-error "Skill overlay migration requires a separate user directory"))
+    (unless (file-exists-p marker)
+      (user-error "No legacy bundled-skills marker found in %s" root))
+    (dolist (user-path (gptel-hermes--skill-files-under-root root))
+      (let* ((id (gptel-hermes--skill-id user-path))
+             (bundled-path (gptel-hermes--bundled-skill-path id)))
+        (when (and (file-regular-p bundled-path)
+                   (string= (gptel-hermes--file-sha256 user-path)
+                            (gptel-hermes--file-sha256 bundled-path)))
+          (push user-path identical))))
+    (if (null identical)
+        "No byte-identical legacy skill copies found."
+      (unless (yes-or-no-p
+               (format "Remove %d byte-identical legacy skill copies? "
+                       (length identical)))
+        (user-error "Skill overlay migration canceled"))
+      (dolist (path identical)
+        (let ((directory (file-name-directory path)))
+          (delete-file path)
+          (gptel-hermes--delete-empty-parent-directories directory root)))
+      (when (file-exists-p marker)
+        (delete-file marker))
+      (format "Removed %d byte-identical legacy skill copies; differing files retained."
+              (length identical)))))
 
 (defun gptel-hermes--validate-value (value label)
   "Validate non-empty string VALUE using LABEL in error messages."
@@ -1033,8 +1350,9 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
 (defun gptel-hermes--atomic-write (path content)
   "Atomically replace PATH with CONTENT."
   (make-directory (file-name-directory path) t)
-  (let ((tmp (make-temp-file "hermes-memory-" nil ".tmp"
-                             (file-name-directory path))))
+  (let ((tmp (make-temp-file (expand-file-name "hermes-memory-"
+                                               (file-name-directory path))
+                             nil ".tmp")))
     (unwind-protect
         (progn
           (with-temp-file tmp (insert content))
@@ -1076,9 +1394,11 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
   (gptel-make-tool
    :name "hermes_skill_view"
    :function #'gptel-hermes-skill-view
-   :description "Load one selected SKILL.md from the Hermes skills index. The returned body is reference context for the current task."
+   :description "Load one selected SKILL.md or relative skill resource from the Hermes skills index. The returned body is reference context for the current task."
    :args (list '(:name "name" :type string
-                 :description "Skill name or relative skill id from the Hermes index"))
+                 :description "Skill name or relative skill id from the Hermes index")
+               '(:name "resource" :type string :optional t
+                 :description "Optional relative resource path such as references/example.txt"))
    :category "hermes" :confirm nil :include t))
 
 (defvar gptel-hermes--skill-validate-tool
@@ -1108,6 +1428,23 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
                  :description "Skill description, at most 1024 characters")
                '(:name "body" :type string
                  :description "Non-empty Markdown skill body"))
+   :category "hermes" :confirm t :include t))
+
+(defvar gptel-hermes--skill-update-tool
+  (gptel-make-tool
+   :name "hermes_skill_update"
+   :function #'gptel-hermes-skill-update
+   :description (concat
+                "Replace one effective SKILL.md through a user overlay. "
+                "Pass the SHA-256 returned by hermes_skill_view or the file "
+                "reader; bundled files are never modified and invalid content "
+                "is rejected.")
+   :args (list '(:name "skill_id" :type string
+                 :description "Exact relative skill id")
+               '(:name "content" :type string
+                 :description "Complete replacement SKILL.md content")
+               '(:name "expected_sha256" :type string
+                 :description "SHA-256 of the effective current SKILL.md"))
    :category "hermes" :confirm t :include t))
 
 (defvar gptel-hermes--memory-tool
@@ -1174,14 +1511,22 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
 (defvar-local gptel-hermes--base-system-prompt nil)
 (defvar-local gptel-hermes--enabled-p nil)
 
+(defconst gptel-hermes--tool-names
+  '("hermes_skill_view" "hermes_skill_validate" "hermes_skill_create"
+    "hermes_skill_update" "hermes_memory" "hermes_org_agenda"
+    "hermes_org_task" "hermes_file_read" "hermes_file_write"
+    "hermes_apply_patch" "hermes_terminal" "hermes_elisp_call"
+    "hermes_elisp_eval"))
+
 ;;;###autoload
 (defun gptel-hermes-enable ()
   "Enable Hermes context and tools in the current gptel buffer."
   (interactive)
   (unless gptel-hermes--enabled-p
-    (gptel-hermes--sync-bundled-skills)
+    (gptel-hermes-runtime-initialize-workspace)
     (setq gptel-hermes--base-system-prompt gptel-system-prompt
           gptel-hermes--enabled-p t))
+  (gptel-hermes-runtime-initialize-workspace)
   (let ((validation-failures (gptel-hermes--skill-validation-failures)))
     (setq-local gptel-system-prompt
                 (concat (gptel-hermes--prompt) "\n"
@@ -1190,18 +1535,15 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
                 (append (list gptel-hermes--skill-tool
                               gptel-hermes--skill-validate-tool
                               gptel-hermes--skill-create-tool
+                              gptel-hermes--skill-update-tool
                               gptel-hermes--memory-tool
                               gptel-hermes--org-agenda-tool
                               gptel-hermes--org-task-tool)
+                        (gptel-hermes-runtime-tools)
                         (cl-remove-if
                          (lambda (tool)
                            (member (gptel-tool-name tool)
-                                   '("hermes_skill_view"
-                                     "hermes_skill_validate"
-                                     "hermes_skill_create"
-                                     "hermes_memory"
-                                     "hermes_org_agenda"
-                                     "hermes_org_task")))
+                                   gptel-hermes--tool-names))
                          gptel-tools)))
     (if validation-failures
         (message "gptel-hermes enabled: index refreshed; %d invalid skill(s) (use hermes_skill_validate for details)"

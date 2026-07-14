@@ -432,6 +432,123 @@
   (should (equal "hermes_skill_create"
                  (gptel-tool-name gptel-hermes--skill-create-tool))))
 
+(ert-deftest gptel-hermes-skill-overlay-prefers-user-and-falls-back-per-resource ()
+  (let* ((root (make-temp-file "gptel-hermes-overlay-" t))
+         (bundled (expand-file-name "bundled" root))
+         (user (expand-file-name "user" root))
+         (bundled-skill "cat/demo/SKILL.md")
+         (bundled-ref "cat/demo/references/from-bundle.txt")
+         (user-skill "cat/demo/SKILL.md")
+         (user-ref "cat/demo/references/from-user.txt"))
+    (unwind-protect
+        (progn
+          (make-directory (file-name-directory (expand-file-name bundled-ref bundled)) t)
+          (with-temp-file (expand-file-name bundled-skill bundled)
+            (insert "---\nname: demo\ndescription: bundled\n---\n# Bundle\n"))
+          (with-temp-file (expand-file-name bundled-ref bundled) (insert "bundle"))
+          (make-directory (file-name-directory (expand-file-name user-ref user)) t)
+          (with-temp-file (expand-file-name user-skill user)
+            (insert "---\nname: demo\ndescription: user\n---\n# User\n"))
+          (with-temp-file (expand-file-name user-ref user) (insert "user"))
+          (let ((gptel-hermes--bundled-skills-directory bundled)
+                (gptel-hermes-skills-directory user))
+            (let ((entry (gptel-hermes--effective-skill-entry-by-id "cat/demo")))
+              (should (equal user-skill
+                             (file-relative-name (plist-get entry :path) user)))
+              (should (equal (expand-file-name bundled-ref bundled)
+                             (gptel-hermes--skill-resource-path
+                              "cat/demo" "references/from-bundle.txt")))
+              (should (equal (expand-file-name user-ref user)
+                             (gptel-hermes--skill-resource-path
+                              "cat/demo" "references/from-user.txt")))
+              (should (string-match-p "bundle"
+                                      (gptel-hermes-skill-view
+                                       "cat/demo" "references/from-bundle.txt")))
+              (should (string-match-p "user"
+                                      (gptel-hermes-skill-view
+                                       "cat/demo" "references/from-user.txt"))))))
+      (delete-directory root t))))
+
+(ert-deftest gptel-hermes-skill-update-is-copy-on-write-and-reports-drift ()
+  (let* ((root (make-temp-file "gptel-hermes-overlay-" t))
+         (bundled (expand-file-name "bundled" root))
+         (user (expand-file-name "user" root))
+         (path "cat/demo/SKILL.md"))
+    (unwind-protect
+        (progn
+          (make-directory (file-name-directory (expand-file-name path bundled)) t)
+          (with-temp-file (expand-file-name path bundled)
+            (insert "---\nname: demo\ndescription: bundled\n---\n# Bundle\n"))
+          (let ((gptel-hermes--bundled-skills-directory bundled)
+                (gptel-hermes-skills-directory user))
+            (let* ((bundled-path (expand-file-name path bundled))
+                   (sha (gptel-hermes--file-sha256 bundled-path))
+                   (content "---\nname: demo\ndescription: user\n---\n# User\n"))
+              (should (string-match-p "copy-on-write"
+                                      (or (documentation
+                                           #'gptel-hermes-skill-update)
+                                          "copy-on-write")))
+              (gptel-hermes-skill-update "cat/demo" content sha)
+              (should (equal content
+                             (gptel-hermes--read (expand-file-name path user))))
+              (should (string-match-p "bundled_sha256="
+                                      (gptel-hermes--read
+                                       (gptel-hermes--skill-origin-path "cat/demo"))))
+              (with-temp-file bundled-path (insert "changed"))
+              (should (string-match-p "Bundled upstream changed: yes"
+                                      (gptel-hermes-skill-view "cat/demo")))
+              (should-error
+               (gptel-hermes-skill-update "cat/demo" content "stale")))))
+      (delete-directory root t))))
+
+(ert-deftest gptel-hermes-skill-migration-removes-only-identical-copies ()
+  (let* ((root (make-temp-file "gptel-hermes-overlay-" t))
+         (bundled (expand-file-name "bundled" root))
+         (user (expand-file-name "user" root)))
+    (unwind-protect
+        (progn
+          (dolist (path '("cat/same/SKILL.md" "cat/different/SKILL.md"))
+            (make-directory (file-name-directory (expand-file-name path bundled)) t))
+          (with-temp-file (expand-file-name "cat/same/SKILL.md" bundled)
+            (insert "same"))
+          (with-temp-file (expand-file-name "cat/different/SKILL.md" bundled)
+            (insert "bundle"))
+          (copy-directory bundled user nil t t)
+          (with-temp-file (expand-file-name "cat/different/SKILL.md" user)
+            (insert "user"))
+          (with-temp-file (expand-file-name ".gptel-hermes-origin"
+                                            (expand-file-name "cat/same" user))
+            (insert "bundled_sha256=old\n"))
+          (with-temp-file (expand-file-name ".gptel-hermes-bundled-skills" user))
+          (let ((gptel-hermes--bundled-skills-directory bundled)
+                (gptel-hermes-skills-directory user))
+            (cl-letf (((symbol-function 'yes-or-no-p) (lambda (&rest _) t)))
+              (gptel-hermes-migrate-skill-overlay))
+            (should-not (file-exists-p (expand-file-name "cat/same/SKILL.md" user)))
+            (should (file-exists-p (expand-file-name "cat/different/SKILL.md" user)))
+            (should (file-exists-p (expand-file-name
+                                    "cat/same/.gptel-hermes-origin" user)))))
+      (delete-directory root t))))
+
+(ert-deftest gptel-hermes-skill-customize-records-bundled-origin ()
+  (let* ((root (make-temp-file "gptel-hermes-overlay-" t))
+         (bundled (expand-file-name "bundled" root))
+         (user (expand-file-name "user" root))
+         (skill "cat/demo/SKILL.md"))
+    (unwind-protect
+        (progn
+          (make-directory (file-name-directory (expand-file-name skill bundled)) t)
+          (with-temp-file (expand-file-name skill bundled)
+            (insert "---\nname: demo\ndescription: bundled\n---\n# Body\n"))
+          (let ((gptel-hermes--bundled-skills-directory bundled)
+                (gptel-hermes-skills-directory user))
+            (gptel-hermes-skill-customize "cat/demo")
+            (with-temp-file (expand-file-name skill bundled)
+              (insert "changed"))
+            (should (string-match-p "Bundled upstream changed: yes"
+                                    (gptel-hermes-skill-view "cat/demo")))))
+      (delete-directory root t))))
+
 (ert-deftest gptel-hermes-memory-writes-persist-and-target-user ()
   (let ((home (gptel-hermes-test--fixture)))
     (unwind-protect
@@ -510,7 +627,7 @@
                                     gptel-system-prompt))))
       (delete-directory root t))))
 
-(ert-deftest gptel-hermes-sync-copies-bundled-skills-on-enable ()
+(ert-deftest gptel-hermes-enable-uses-bundled-fallback-without-copy ()
   (let* ((source (gptel-hermes-test--bundled-skills-fixture))
          (destination (make-temp-file "gptel-hermes-destination-" t)))
     (unwind-protect
@@ -519,15 +636,15 @@
           (with-temp-buffer
             (setq-local gptel-system-prompt "base")
             (gptel-hermes-enable))
-          (should (equal "bundled demo skill\n"
-                         (gptel-hermes--read
-                          (expand-file-name "category/demo/SKILL.md" destination))))
           (should-not (file-exists-p
-                       (expand-file-name "DESCRIPTION.md" destination)))
+                       (expand-file-name "category/demo/SKILL.md" destination)))
           (should-not (file-exists-p
-                       (expand-file-name "references/ignored/SKILL.md" destination)))
-          (should (file-exists-p
-                   (expand-file-name ".gptel-hermes-bundled-skills" destination))))
+                       (expand-file-name ".gptel-hermes-bundled-skills" destination)))
+          (should (equal
+                   (expand-file-name "category/demo/SKILL.md" source)
+                   (car (gptel-hermes--skill-files))))
+          (should-not (file-exists-p
+                       (expand-file-name "references/ignored/SKILL.md" destination))))
       (delete-directory source t)
       (delete-directory destination t))))
 
