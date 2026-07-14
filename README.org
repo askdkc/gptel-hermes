@@ -96,6 +96,27 @@ hermes_skill_view("software-development/example", "references/example.txt")
 
 Orgタスクを扱う場合は、先に =hermes_org_agenda= で現在のfile・line・heading・keywordを取得し、その値を =hermes_org_task= に渡します。一般のfile/terminal toolでOrgファイルを直接書き換えないでください。
 
+** 送信メニュー
+
+デフォルトでは、=gptel-hermes-enable= を実行すると、gptel bufferの
+=C-c RET= が直接送信ではなくgptel標準の =gptel-menu= を開くようになります。
+
+メニューでは次の操作ができます。
+
+- active regionがある状態で =RET=: regionだけを送信
+- active regionがない状態で =RET=: pointまでのconversationを送信
+- メニューで =m= を押してから =RET=: minibufferに入力したpromptを送信
+- minibufferでpromptを入力中に =M-RET=: regionを送信内容に含める／除外する
+
+従来どおり =C-c RET= で直接 =gptel-send= を呼びたい場合は、次を設定してから
+=gptel-hermes-enable= を実行してください。
+
+#+begin_src emacs-lisp
+(setq gptel-hermes-use-send-menu nil)
+#+end_src
+
+=M-x gptel-send= 自体はこの設定に関係なく利用できます。
+
 ** ユーザーが使う主なコマンド
 
 | コマンド | 用途 |
@@ -333,8 +354,12 @@ M-x gptel-hermes-prompt-inspect
 gptel の checkout を load-path に指定して実行します。
 
 #+begin_src sh
-emacs --batch -L /path/to/gptel -L . -f batch-byte-compile gptel-hermes-runtime.el gptel-hermes.el
-emacs --batch -L /path/to/gptel -L . -L tests \
+emacs --batch -Q \
+  --eval '(progn (require '\''package) (package-initialize))' \
+  -L /path/to/gptel -L . -f batch-byte-compile gptel-hermes-runtime.el gptel-hermes.el
+emacs --batch -Q \
+  --eval '(progn (require '\''package) (package-initialize))' \
+  -L /path/to/gptel -L . -L tests \
   -l tests/gptel-hermes-tests.el \
   -l tests/gptel-hermes-runtime-tests.el \
   -f ert-run-tests-batch-and-exit
@@ -343,8 +368,12 @@ emacs --batch -L /path/to/gptel -L . -L tests \
 - macOSの場合
   macOSの場合はemacsコマンドは =/Applications= ディレクトリ配下になります。
   #+begin_src sh
-  /Applications/Emacs.app/Contents/MacOS/Emacs --batch -L /path/to/gptel -L . -f batch-byte-compile gptel-hermes-runtime.el gptel-hermes.el
-  /Applications/Emacs.app/Contents/MacOS/Emacs --batch -L /path/to/gptel -L . -L tests \
+  /Applications/Emacs.app/Contents/MacOS/Emacs --batch -Q \
+  --eval '(progn (require '\''package) (package-initialize))' \
+  -L /path/to/gptel -L . -f batch-byte-compile gptel-hermes-runtime.el gptel-hermes.el
+  /Applications/Emacs.app/Contents/MacOS/Emacs --batch -Q \
+  --eval '(progn (require '\''package) (package-initialize))' \
+  -L /path/to/gptel -L . -L tests \
   -l tests/gptel-hermes-tests.el \
   -l tests/gptel-hermes-runtime-tests.el \
   -f ert-run-tests-batch-and-exit

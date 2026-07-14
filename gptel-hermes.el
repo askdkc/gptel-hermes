@@ -28,6 +28,8 @@
 (require 'org-capture)
 (require 'org-element)
 
+(declare-function gptel-menu "gptel-transient" ())
+
 (defgroup gptel-hermes nil
   "Hermes skill and memory context for gptel."
   :group 'gptel)
@@ -56,6 +58,14 @@ exists."
 The default is ~/.gptel-hermes.  HERMES_HOME is not used implicitly, so
 gptel-hermes does not share memory with a separate Hermes Agent installation."
   :type '(choice (const nil) directory)
+  :group 'gptel-hermes)
+
+(defcustom gptel-hermes-use-send-menu t
+  "Whether `gptel-hermes-enable' changes `C-c RET' to `gptel-menu'.
+
+When non-nil, the shared `gptel-mode-map' binding is changed for all gptel
+buffers in the current Emacs session.  When nil, the binding is left alone."
+  :type 'boolean
   :group 'gptel-hermes)
 
 (defconst gptel-hermes--excluded-directories
@@ -1522,6 +1532,9 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
 (defun gptel-hermes-enable ()
   "Enable Hermes context and tools in the current gptel buffer."
   (interactive)
+  (when gptel-hermes-use-send-menu
+    (require 'gptel-transient)
+    (define-key gptel-mode-map (kbd "C-c RET") #'gptel-menu))
   (unless gptel-hermes--enabled-p
     (gptel-hermes-runtime-initialize-workspace)
     (setq gptel-hermes--base-system-prompt gptel-system-prompt
