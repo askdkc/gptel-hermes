@@ -3,8 +3,6 @@
 (require 'ert)
 (require 'gptel-hermes)
 
-(declare-function gptel-menu "gptel-transient" ())
-
 (defun gptel-hermes-test--fixture ()
   (let* ((home (make-temp-file "gptel-hermes-" t))
          (skill-dir (expand-file-name "skills/code/demo" home))
@@ -1302,8 +1300,7 @@ so required dependencies cannot be hidden from the audit."
   (let ((members (get 'gptel-hermes 'custom-group)))
     (dolist (variable '(gptel-hermes-skills-directory
                         gptel-hermes-home
-                        gptel-hermes-org-directory-fallback
-                        gptel-hermes-use-send-menu))
+                        gptel-hermes-org-directory-fallback))
                 (should
                  (cl-some (lambda (member)
                   (eq variable (if (consp member) (car member) member)))
@@ -1392,46 +1389,48 @@ so required dependencies cannot be hidden from the audit."
                                     result))))
       (delete-directory root t))))
 
-(ert-deftest gptel-hermes-enable-binds-send-key-to-menu-by-default ()
-  (let* ((home (gptel-hermes-test--fixture))
-         (key (kbd "C-c RET"))
-         (original (lookup-key gptel-mode-map key)))
+(ert-deftest gptel-hermes-send-enables-current-buffer-before-sending ()
+  (let ((home (gptel-hermes-test--fixture))
+        sent)
     (unwind-protect
-        (progn
-          (should (eq t (default-value 'gptel-hermes-use-send-menu)))
-          (let ((gptel-hermes-home home)
-                (gptel-hermes--bundled-skills-directory
-                 (expand-file-name "skills" home))
-                (gptel-hermes-skills-directory
-                 (expand-file-name "skills" home)))
-            (with-temp-buffer
-              (setq-local gptel-system-prompt "base")
-              (gptel-hermes-enable)
-              (gptel-hermes-enable)))
-          (should (featurep 'gptel-transient))
-          (should (eq (lookup-key gptel-mode-map key) #'gptel-menu)))
-      (define-key gptel-mode-map key original)
+        (let ((gptel-hermes-home home)
+              (gptel-hermes--bundled-skills-directory
+               (expand-file-name "skills" home))
+              (gptel-hermes-skills-directory
+               (expand-file-name "skills" home)))
+          (with-temp-buffer
+            (setq-local gptel-system-prompt "base")
+            (cl-letf (((symbol-function 'gptel-send)
+                       (lambda (&optional arg)
+                         (setq sent
+                               (list arg
+                                     gptel-hermes--enabled-p
+                                     (and (string-match-p
+                                           "## Hermes Skills"
+                                           gptel-system-prompt)
+                                          t)
+                                     (and (member
+                                           "hermes_skill_view"
+                                           (mapcar #'gptel-tool-name gptel-tools))
+                                          t))))))
+              (gptel-hermes-send '(4))))
+          (should (equal '((4) t t t) sent)))
       (delete-directory home t))))
 
-(ert-deftest gptel-hermes-enable-preserves-send-key-when-menu-disabled ()
-  (let* ((home (gptel-hermes-test--fixture))
-         (key (kbd "C-c RET"))
-         (original (lookup-key gptel-mode-map key)))
+(ert-deftest gptel-hermes-global-send-mode-binds-outside-and-inside-gptel ()
+  (let ((was-enabled gptel-hermes-global-send-mode))
     (unwind-protect
-        (dolist (binding (list #'gptel-send #'ignore))
-          (define-key gptel-mode-map key binding)
-          (let ((gptel-hermes-use-send-menu nil)
-                (gptel-hermes-home home)
-                (gptel-hermes--bundled-skills-directory
-                 (expand-file-name "skills" home))
-                (gptel-hermes-skills-directory
-                 (expand-file-name "skills" home)))
-            (with-temp-buffer
-              (setq-local gptel-system-prompt "base")
-              (gptel-hermes-enable)))
-          (should (eq (lookup-key gptel-mode-map key) binding)))
-      (define-key gptel-mode-map key original)
-      (delete-directory home t))))
+        (progn
+          (gptel-hermes-global-send-mode 1)
+          (with-temp-buffer
+            (should (eq (key-binding (kbd "C-c RET"))
+                        #'gptel-hermes-send)))
+          (with-temp-buffer
+            (text-mode)
+            (gptel-mode 1)
+            (should (eq (key-binding (kbd "C-c RET"))
+                        #'gptel-hermes-send))))
+      (gptel-hermes-global-send-mode (if was-enabled 1 -1)))))
 
 (ert-deftest gptel-hermes-enable-removes-disabled-hermes-tools ()
   (let* ((home (gptel-hermes-test--fixture))
@@ -1440,7 +1439,6 @@ so required dependencies cannot be hidden from the audit."
           (expand-file-name "skills" home))
          (gptel-hermes-skills-directory
           (expand-file-name "skills" home))
-         (gptel-hermes-use-send-menu nil)
          (gptel-hermes--runtime-elisp-eval-tool nil)
          (gptel-hermes-enable-unsafe-elisp-eval t)
          (gptel-hermes-enable-authenticated-terminal t))
@@ -1785,8 +1783,7 @@ so required dependencies cannot be hidden from the audit."
         (progn
           (with-temp-file marker (insert ""))
           (let ((gptel-hermes--bundled-skills-directory source)
-                (gptel-hermes-skills-directory destination)
-                (gptel-hermes-use-send-menu nil))
+                (gptel-hermes-skills-directory destination))
             (cl-letf (((symbol-function 'display-warning)
                        (lambda (_type message &rest _)
                          (setq warning message)))
