@@ -1389,6 +1389,76 @@ so required dependencies cannot be hidden from the audit."
                                     result))))
       (delete-directory root t))))
 
+(ert-deftest gptel-hermes-skill-view-tool-never-confirms ()
+  (should-not (gptel-tool-confirm gptel-hermes--skill-tool))
+  (should (equal '(:confirm nil)
+                 (gptel-hermes--pre-tool-call
+                  '(:name "hermes_skill_view" :args (:name "demo"))))))
+
+(ert-deftest gptel-hermes-terminal-confirmation-can-cover-buffer-session ()
+  (let ((first-root (make-temp-file "gptel-hermes-terminal-first-" t))
+        (second-root (make-temp-file "gptel-hermes-terminal-second-" t)))
+    (unwind-protect
+        (with-temp-buffer
+          (setq-local gptel-hermes--workspace-root
+                      (file-name-as-directory (file-truename first-root)))
+          (let ((prompt-count 0)
+                (call '(:name "hermes_terminal"
+                        :args (:program "git" :arguments ["status"]))))
+            (cl-letf (((symbol-function 'read-multiple-choice)
+                       (lambda (&rest _)
+                         (cl-incf prompt-count)
+                         (if (= prompt-count 1)
+                             '(?s "session" "session")
+                           '(?o "once" "once")))))
+              (should (equal '(:confirm nil)
+                             (gptel-hermes--pre-tool-call call)))
+              (should (equal gptel-hermes--workspace-root
+                             gptel-hermes--terminal-session-workspace))
+              (should (equal '(:confirm nil)
+                             (gptel-hermes--pre-tool-call call)))
+              (should (= 1 prompt-count))
+              (setq-local gptel-hermes--workspace-root
+                          (file-name-as-directory
+                           (file-truename second-root)))
+              (should (equal '(:confirm nil)
+                             (gptel-hermes--pre-tool-call call)))
+              (should (= 2 prompt-count)))))
+      (delete-directory first-root t)
+      (delete-directory second-root t))))
+
+(ert-deftest gptel-hermes-terminal-confirmation-offers-inspect-and-deny ()
+  (let ((root (make-temp-file "gptel-hermes-terminal-" t))
+        (choices '((?o "once" "once")
+                   (?i "inspect" "inspect")
+                   (?n "deny" "deny"))))
+    (unwind-protect
+        (with-temp-buffer
+          (setq-local gptel-hermes--workspace-root
+                      (file-name-as-directory (file-truename root)))
+          (cl-letf (((symbol-function 'read-multiple-choice)
+                     (lambda (&rest _) (pop choices))))
+            (let ((call '(:name "hermes_terminal"
+                          :args (:program "printf" :arguments ["ok"]))))
+              (should (equal '(:confirm nil)
+                             (gptel-hermes--pre-tool-call call)))
+              (should-not gptel-hermes--terminal-session-workspace)
+              (should (equal '(:confirm t)
+                             (gptel-hermes--pre-tool-call call)))
+              (should (equal
+                       '(:block "User denied this hermes_terminal call.")
+                       (gptel-hermes--pre-tool-call call))))))
+      (delete-directory root t))))
+
+(ert-deftest gptel-hermes-terminal-session-does-not-cover-auth-terminal ()
+  (with-temp-buffer
+    (setq-local gptel-hermes--terminal-session-workspace "/tmp/example/")
+    (cl-letf (((symbol-function 'read-multiple-choice)
+               (lambda (&rest _) (ert-fail "Unexpected confirmation"))))
+      (should-not
+       (gptel-hermes--pre-tool-call
+        '(:name "hermes_terminal_authenticated" :args nil))))))
+
 (ert-deftest gptel-hermes-send-point-choice-enables-before-sending ()
   (let ((home (gptel-hermes-test--fixture))
         sent)
@@ -1414,10 +1484,41 @@ so required dependencies cannot be hidden from the audit."
                                      (and (member
                                            "hermes_skill_view"
                                            (mapcar #'gptel-tool-name gptel-tools))
+                                          t)
+                                     (and (memq
+                                           #'gptel-hermes--pre-tool-call
+                                           gptel-pre-tool-call-functions)
                                           t))))))
               (gptel-hermes-send)))
-          (should (equal '(nil t t t) sent)))
+          (should (equal '(nil t t t t) sent)))
       (delete-directory home t))))
+
+(ert-deftest gptel-hermes-send-prompts-for-unset-workspace ()
+  (let* ((root (make-temp-file "gptel-hermes-workspace-" t))
+         (initial (file-name-as-directory (expand-file-name root)))
+         read-args sent)
+    (unwind-protect
+        (with-temp-buffer
+          (setq-local default-directory initial
+                      gptel-hermes--enabled-p t
+                      gptel-hermes--workspace-initialized-p t
+                      gptel-hermes--workspace-root nil)
+          (cl-letf (((symbol-function 'read-char-choice)
+                     (lambda (&rest _) ?p))
+                    ((symbol-function 'read-directory-name)
+                     (lambda (prompt &optional directory default mustmatch input)
+                       (setq read-args
+                             (list prompt directory default mustmatch input))
+                       root))
+                    ((symbol-function 'gptel-send)
+                     (lambda (&rest _)
+                       (setq sent gptel-hermes--workspace-root))))
+            (gptel-hermes-send))
+          (should sent)
+          (should (string-match-p "workspace未設定" (car read-args)))
+          (should (equal (cdr read-args)
+                         (list initial initial t initial))))
+      (delete-directory root t))))
 
 (ert-deftest gptel-hermes-send-region-choice-starts-selection-only ()
   (with-temp-buffer
@@ -1445,6 +1546,7 @@ so required dependencies cannot be hidden from the audit."
     (let ((transient-mark-mode t)
           (mark-active t)
           (gptel-hermes--enabled-p t)
+          (gptel-hermes--workspace-root default-directory)
           sent)
       (should (use-region-p))
       (cl-letf (((symbol-function 'read-char-choice)
@@ -1455,9 +1557,9 @@ so required dependencies cannot be hidden from the audit."
       (should (equal '(sent) sent)))))
 
 (ert-deftest gptel-hermes-send-minibuffer-choice-uses-gptel-send-flow ()
-  (require 'gptel-transient)
   (with-temp-buffer
     (let ((gptel-hermes--enabled-p t)
+          (gptel-hermes--workspace-root default-directory)
           sent)
       (cl-letf (((symbol-function 'read-char-choice)
                  (lambda (&rest _) ?m))

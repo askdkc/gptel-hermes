@@ -33,6 +33,25 @@
                            (gptel-hermes-set-workspace root)))
           (delete-directory root t))))))
 
+(ert-deftest gptel-hermes-set-workspace-displays-current-directory-initially ()
+  (let* ((root (gptel-hermes-runtime-test--root))
+         (initial (file-name-as-directory (expand-file-name root)))
+         read-args)
+    (unwind-protect
+        (with-temp-buffer
+          (setq-local default-directory initial)
+          (cl-letf (((symbol-function 'read-directory-name)
+                     (lambda (prompt &optional directory default mustmatch input)
+                       (setq read-args
+                             (list prompt directory default mustmatch input))
+                       root)))
+            (call-interactively #'gptel-hermes-set-workspace))
+          (should (equal (cdr read-args)
+                         (list initial initial t initial)))
+          (should (equal gptel-hermes--workspace-root
+                         (file-name-as-directory (file-truename root)))))
+      (delete-directory root t))))
+
 (ert-deftest gptel-hermes-runtime-paths-reject-escape-secrets-and-symlinks ()
   (let* ((root (gptel-hermes-runtime-test--root))
          (outside (gptel-hermes-runtime-test--root)))

@@ -147,7 +147,11 @@ environment variables are then available to the invoked program."
 
 (defun gptel-hermes-set-workspace (&optional directory)
   "Set the current buffer's workspace to DIRECTORY."
-  (interactive (list (read-directory-name "Workspace: " default-directory nil t)))
+  (interactive
+   (let ((initial (file-name-as-directory
+                   (expand-file-name default-directory))))
+     (list (read-directory-name "Workspace: "
+                                initial initial t initial))))
   (setq-local gptel-hermes--workspace-root
               (gptel-hermes-runtime--canonical-directory directory))
   (setq-local gptel-hermes--workspace-initialized-p t)

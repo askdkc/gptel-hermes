@@ -2,7 +2,7 @@
 ;; Author: dkc
 ;; Copyright (C) 2026 dkc
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "30.1") (gptel "0.9.8"))
+;; Package-Requires: ((emacs "30.1") (gptel "0.9.9.5"))
 ;; Keywords: convenience, tools
 ;; URL: https://github.com/askdkc/gptel-hermes
 
@@ -1744,6 +1744,47 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
 
 (defvar-local gptel-hermes--base-system-prompt nil)
 (defvar-local gptel-hermes--enabled-p nil)
+(defvar-local gptel-hermes--terminal-session-workspace nil
+  "Workspace where `hermes_terminal' is approved for this buffer session.")
+
+(defun gptel-hermes--ensure-workspace ()
+  "Return the current workspace, prompting to set it when unset."
+  (or gptel-hermes--workspace-root
+      (let* ((initial (file-name-as-directory
+                       (expand-file-name default-directory)))
+             (enable-recursive-minibuffers t)
+             (directory
+              (read-directory-name
+               "Hermes workspace未設定。送信前に設定: "
+               initial initial t initial)))
+        (gptel-hermes-set-workspace directory))))
+
+(defun gptel-hermes--pre-tool-call (call)
+  "Apply Hermes confirmation policy to one gptel tool CALL."
+  (pcase (plist-get call :name)
+    ("hermes_skill_view" '(:confirm nil))
+    ("hermes_terminal"
+     (let ((workspace (gptel-hermes--ensure-workspace)))
+       (if (equal workspace gptel-hermes--terminal-session-workspace)
+           '(:confirm nil)
+         (let* ((summary
+                 (truncate-string-to-width
+                  (format "%S" (plist-get call :args)) 160 nil nil "…"))
+                (choice
+                 (car
+                  (read-multiple-choice
+                   (format "hermes_terminal %s: " summary)
+                   '((?o "once" "今回だけ実行する")
+                     (?s "session" "同じworkspaceのこのbufferでは再確認しない")
+                     (?i "inspect" "gptel標準画面で詳細を確認する")
+                     (?n "deny" "この呼び出しを拒否する"))))))
+           (pcase choice
+             (?o '(:confirm nil))
+             (?s
+              (setq-local gptel-hermes--terminal-session-workspace workspace)
+              '(:confirm nil))
+             (?i '(:confirm t))
+             (?n '(:block "User denied this hermes_terminal call.")))))))))
 
 (defun gptel-hermes--warn-legacy-skill-overlay ()
   "Warn when the configured overlay has an old sync marker."
@@ -1765,6 +1806,8 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
     (setq gptel-hermes--base-system-prompt gptel-system-prompt
           gptel-hermes--enabled-p t))
   (gptel-hermes--warn-legacy-skill-overlay)
+  (add-hook 'gptel-pre-tool-call-functions
+            #'gptel-hermes--pre-tool-call nil t)
   (let* ((hermes-tools
           (append (list gptel-hermes--skill-tool
                         gptel-hermes--skill-resource-path-tool
@@ -1822,9 +1865,11 @@ region, or read the prompt from the minibuffer."
           (message "region終点へ移動し、C-c RETで送信してください"))
       (unless gptel-hermes--enabled-p
         (gptel-hermes-enable))
+      (gptel-hermes--ensure-workspace)
       (if (eq action ?m)
           (progn
-            (require 'gptel-transient)
+            (unless (fboundp 'gptel--suffix-send)
+              (require 'gptel-transient))
             ;; ponytail: reuse gptel's prompt/tool flow until it exposes a
             ;; public command for starting a minibuffer-backed send.
             (gptel--suffix-send '("m")))
