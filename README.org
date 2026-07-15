@@ -109,9 +109,14 @@ Orgタスクを扱う場合は、先に =hermes_org_agenda= で現在のfile・l
 (gptel-hermes-global-send-mode 1)
 #+end_src
 
-送信範囲はgptel標準と同じです。active regionがあればregionだけを送り、なければ
-buffer先頭からpointまでを送ります。prefix argument付きの =C-u C-c RET= は
-Hermesを有効化してからgptel標準の送信menuを開きます。
+active regionがあればregionだけを即送信します。regionがなければ次の3択を表示します。
+
+- =p=: buffer先頭からpointまでを送信
+- =r=: 現在のpointでmarkを開始。終点へ移動後、もう一度 =C-c RET= で送信
+- =m=: gptel標準のminibuffer promptへ入力して送信
+
+prefix argument付きの =C-u C-c RET= は3択を省略し、Hermesを有効化してから
+gptel標準の送信menuを開きます。
 
 ** ユーザーが使う主なコマンド
 

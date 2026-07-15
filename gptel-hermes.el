@@ -29,6 +29,8 @@
 (require 'org-capture)
 (require 'org-element)
 
+(declare-function gptel--suffix-send "gptel-transient" (args))
+
 (defgroup gptel-hermes nil
   "Hermes skill and memory context for gptel."
   :group 'gptel)
@@ -1802,11 +1804,31 @@ uses an existing capture TEMPLATE to insert TEXT into an agenda file."
 
 ;;;###autoload
 (defun gptel-hermes-send (&optional arg)
-  "Enable Hermes in the current buffer, then call `gptel-send' with ARG."
+  "Send from the current buffer with Hermes enabled.
+
+With an active region, send it directly.  With prefix ARG, pass ARG to
+`gptel-send'.  Otherwise ask whether to send through point, start selecting a
+region, or read the prompt from the minibuffer."
   (interactive "P")
-  (unless gptel-hermes--enabled-p
-    (gptel-hermes-enable))
-  (gptel-send arg))
+  (let ((action
+         (if (or arg (use-region-p))
+             'send
+           (read-char-choice
+            "送信方法: [p] pointまで  [r] region選択  [m] prompt入力: "
+            '(?p ?r ?m)))))
+    (if (eq action ?r)
+        (progn
+          (push-mark (point) t t)
+          (message "region終点へ移動し、C-c RETで送信してください"))
+      (unless gptel-hermes--enabled-p
+        (gptel-hermes-enable))
+      (if (eq action ?m)
+          (progn
+            (require 'gptel-transient)
+            ;; ponytail: reuse gptel's prompt/tool flow until it exposes a
+            ;; public command for starting a minibuffer-backed send.
+            (gptel--suffix-send '("m")))
+        (gptel-send arg)))))
 
 (defvar-keymap gptel-hermes-global-send-mode-map
   :doc "Keymap for `gptel-hermes-global-send-mode'."

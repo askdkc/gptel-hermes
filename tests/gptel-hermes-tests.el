@@ -1389,7 +1389,7 @@ so required dependencies cannot be hidden from the audit."
                                     result))))
       (delete-directory root t))))
 
-(ert-deftest gptel-hermes-send-enables-current-buffer-before-sending ()
+(ert-deftest gptel-hermes-send-point-choice-enables-before-sending ()
   (let ((home (gptel-hermes-test--fixture))
         sent)
     (unwind-protect
@@ -1400,7 +1400,9 @@ so required dependencies cannot be hidden from the audit."
                (expand-file-name "skills" home)))
           (with-temp-buffer
             (setq-local gptel-system-prompt "base")
-            (cl-letf (((symbol-function 'gptel-send)
+            (cl-letf (((symbol-function 'read-char-choice)
+                       (lambda (&rest _) ?p))
+                      ((symbol-function 'gptel-send)
                        (lambda (&optional arg)
                          (setq sent
                                (list arg
@@ -1413,9 +1415,58 @@ so required dependencies cannot be hidden from the audit."
                                            "hermes_skill_view"
                                            (mapcar #'gptel-tool-name gptel-tools))
                                           t))))))
-              (gptel-hermes-send '(4))))
-          (should (equal '((4) t t t) sent)))
+              (gptel-hermes-send)))
+          (should (equal '(nil t t t) sent)))
       (delete-directory home t))))
+
+(ert-deftest gptel-hermes-send-region-choice-starts-selection-only ()
+  (with-temp-buffer
+    (insert "abcdef")
+    (goto-char 4)
+    (let ((transient-mark-mode t)
+          enabled sent)
+      (cl-letf (((symbol-function 'read-char-choice)
+                 (lambda (&rest _) ?r))
+                ((symbol-function 'gptel-hermes-enable)
+                 (lambda () (setq enabled t)))
+                ((symbol-function 'gptel-send)
+                 (lambda (&rest _) (setq sent t))))
+        (gptel-hermes-send))
+      (should mark-active)
+      (should (= 4 (mark)))
+      (should-not enabled)
+      (should-not sent))))
+
+(ert-deftest gptel-hermes-send-active-region-skips-question ()
+  (with-temp-buffer
+    (insert "abcdef")
+    (goto-char 5)
+    (set-mark 2)
+    (let ((transient-mark-mode t)
+          (mark-active t)
+          (gptel-hermes--enabled-p t)
+          sent)
+      (should (use-region-p))
+      (cl-letf (((symbol-function 'read-char-choice)
+                 (lambda (&rest _) (ert-fail "Unexpected choice prompt")))
+                ((symbol-function 'gptel-send)
+                 (lambda (&optional arg) (setq sent (cons 'sent arg)))))
+        (gptel-hermes-send))
+      (should (equal '(sent) sent)))))
+
+(ert-deftest gptel-hermes-send-minibuffer-choice-uses-gptel-send-flow ()
+  (require 'gptel-transient)
+  (with-temp-buffer
+    (let ((gptel-hermes--enabled-p t)
+          sent)
+      (cl-letf (((symbol-function 'read-char-choice)
+                 (lambda (&rest _) ?m))
+                ((symbol-function 'gptel--suffix-send)
+                 (lambda (args) (setq sent args)))
+                ((symbol-function 'gptel-send)
+                 (lambda (&rest _) (ert-fail "Unexpected direct send"))))
+        (gptel-hermes-send))
+      (should (equal '("m") sent)))))
 
 (ert-deftest gptel-hermes-global-send-mode-binds-outside-and-inside-gptel ()
   (let ((was-enabled gptel-hermes-global-send-mode))
