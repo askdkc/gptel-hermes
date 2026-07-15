@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal, hermes_skill_resource_path]
 name: ocr-and-documents
 description: "Extract text from PDFs/scans (pymupdf, marker-pdf)."
 version: 2.3.0
@@ -19,16 +20,17 @@ This skill covers **PDFs and scanned documents**.
 
 ## Step 1: Remote URL Available?
 
-If the document has a URL, **always try `web_extract` first**:
+If the document has a URL, **try the optional `web_extract` integration first**
+when it is available:
 
-```
-web_extract(urls=["https://arxiv.org/pdf/2402.03300"])
-web_extract(urls=["https://example.com/report.pdf"])
-```
+Pass the URL to that integration using its configured schema. If it is not
+available or fails, use `curl` through `hermes_terminal` to save the document
+inside the workspace, then continue with local extraction.
 
 This handles PDF-to-markdown conversion via Firecrawl with no local dependencies.
 
-Only use local extraction when: the file is local, web_extract fails, or you need batch processing.
+Only use local extraction when: the file is local, remote extraction fails, or
+you need batch processing.
 
 ## Step 2: Choose Local Extractor
 
@@ -64,12 +66,14 @@ pip install pymupdf pymupdf4llm
 
 **Via helper script**:
 ```bash
-python scripts/extract_pymupdf.py document.pdf              # Plain text
-python scripts/extract_pymupdf.py document.pdf --markdown    # Markdown
-python scripts/extract_pymupdf.py document.pdf --tables      # Tables
-python scripts/extract_pymupdf.py document.pdf --images out/ # Extract images
-python scripts/extract_pymupdf.py document.pdf --metadata    # Title, author, pages
-python scripts/extract_pymupdf.py document.pdf --pages 0-4   # Specific pages
+Resolve `scripts/extract_pymupdf.py` with `hermes_skill_resource_path` and
+substitute its returned absolute path below:
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf              # Plain text
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --markdown    # Markdown
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --tables      # Tables
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --images out/ # Extract images
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --metadata    # Title, author, pages
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --pages 0-4   # Specific pages
 ```
 
 **Inline**:
@@ -88,18 +92,19 @@ for page in doc:
 
 ```bash
 # Check disk space first
-python scripts/extract_marker.py --check
+Resolve `scripts/extract_marker.py` with `hermes_skill_resource_path` first.
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" --check
 
 pip install marker-pdf
 ```
 
 **Via helper script**:
 ```bash
-python scripts/extract_marker.py document.pdf                # Markdown
-python scripts/extract_marker.py document.pdf --json         # JSON with metadata
-python scripts/extract_marker.py document.pdf --output_dir out/  # Save images
-python scripts/extract_marker.py scanned.pdf                 # Scanned PDF (OCR)
-python scripts/extract_marker.py document.pdf --use_llm      # LLM-boosted accuracy
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf                # Markdown
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --json         # JSON with metadata
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --output_dir out/  # Save images
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" scanned.pdf                 # Scanned PDF (OCR)
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" document.pdf --use_llm      # LLM-boosted accuracy
 ```
 
 **CLI** (installed with marker-pdf):
@@ -114,18 +119,19 @@ marker /path/to/folder --workers 4    # Batch
 
 ```
 # Abstract only (fast)
-web_extract(urls=["https://arxiv.org/abs/2402.03300"])
+Use the optional `web_extract` integration for the URL when available.
 
 # Full paper
-web_extract(urls=["https://arxiv.org/pdf/2402.03300"])
+Use the optional `web_extract` integration for the PDF URL when available.
 
 # Search
-web_search(query="arxiv GRPO reinforcement learning 2026")
+Use an available `web_search` integration for discovery when configured.
 ```
 
 ## Split, Merge & Search
 
-pymupdf handles these natively — use `execute_code` or inline Python:
+pymupdf handles these natively — run inline Python through
+`hermes_terminal` (or use the bundled helper after resolving it above):
 
 ```python
 # Split: extract pages 1-5 to a new PDF
@@ -167,6 +173,7 @@ No extra dependencies needed — pymupdf covers split, merge, search, and text e
 - pymupdf is the safe default — instant, no models, works everywhere
 - marker-pdf is for OCR, scanned docs, equations, complex layouts — install only when needed
 - Both helper scripts accept `--help` for full usage
-- marker-pdf downloads ~2.5GB of models to `~/.cache/huggingface/` on first use
+- marker-pdf downloads roughly 2.5GB of models to its cache on first use; this
+  cache is disposable under the terminal's temporary HOME.
 - For Word docs: `pip install python-docx` (better than OCR — parses actual structure)
 - For PowerPoint: see the `powerpoint` skill (uses python-pptx)

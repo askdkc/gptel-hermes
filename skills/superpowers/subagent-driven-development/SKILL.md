@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_read, delegate_task, todo]
 name: subagent-driven-development
 description: "Execute plans via delegate_task subagents (2-stage review)."
 version: 1.1.0
@@ -41,7 +42,7 @@ Read the plan file. Extract ALL tasks with their full text and context upfront. 
 
 ```python
 # Read the plan
-read_file("docs/plans/feature-plan.md")
+hermes_file_read(path="docs/plans/feature-plan.md")
 
 # Create todo list with all tasks
 todo([

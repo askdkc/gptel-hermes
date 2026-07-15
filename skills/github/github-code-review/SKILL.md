@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_read, hermes_skill_resource_path, hermes_terminal]
 name: github-code-review
 description: "Review PRs: diffs, inline comments via gh or REST."
 version: 1.1.0
@@ -15,32 +16,27 @@ metadata:
 
 Perform code reviews on local changes before pushing, or review open PRs on GitHub. Most of this skill uses plain `git` — the `gh`/`curl` split only matters for PR-level interactions.
 
+Run local review commands through `hermes_terminal`. PR-level API/CLI actions
+require the separately enabled `hermes_terminal_authenticated` tool; that
+optional capability is not needed for local-only review.
+
 ## Prerequisites
 
-- Authenticated with GitHub (see `github-auth` skill)
 - Inside a git repository
+- GitHub authentication is required only for PR-level API/CLI interactions;
+  local diff review works without it.
 
 ### Setup (for PR interactions)
 
-```bash
-if command -v gh &>/dev/null && gh auth status &>/dev/null; then
-  AUTH="gh"
-else
-  AUTH="git"
-  if [ -z "$GITHUB_TOKEN" ]; then
-    if _hermes_env="${HERMES_HOME:-$HOME/.hermes}/.env"; [ -f "$_hermes_env" ] && grep -q "^GITHUB_TOKEN=" "$_hermes_env"; then
-      GITHUB_TOKEN=$(grep "^GITHUB_TOKEN=" "$_hermes_env" | head -1 | cut -d= -f2 | tr -d '\n\r')
-    elif grep -q "github.com" ~/.git-credentials 2>/dev/null; then
-      GITHUB_TOKEN=$(grep "github.com" ~/.git-credentials 2>/dev/null | head -1 | sed 's|https://[^:]*:\([^@]*\)@.*|\1|')
-    fi
-  fi
-fi
-
-REMOTE_URL=$(git remote get-url origin)
-OWNER_REPO=$(echo "$REMOTE_URL" | sed -E 's|.*github\.com[:/]||; s|\.git$||')
-OWNER=$(echo "$OWNER_REPO" | cut -d/ -f1)
-REPO=$(echo "$OWNER_REPO" | cut -d/ -f2)
-```
+Resolve `github-auth/scripts/gh-env.sh` with
+`hermes_skill_resource_path(name="github-auth", resource="scripts/gh-env.sh")`.
+For every curl fallback below, source that returned path and run the consuming
+commands in the same authenticated `bash -c` call.  Terminal calls are
+stateless, and terminal arguments cannot contain newlines, so keep each shell
+argument on one physical line.  The helper exports `GITHUB_TOKEN`, `GH_OWNER`,
+and `GH_REPO`; do not use shell variables from an earlier call.
+Pass a full PR URL when the current repository has no GitHub `origin`; curl
+fallbacks must validate the derived owner and repository before making a request.
 
 ---
 
@@ -73,7 +69,8 @@ git diff main...HEAD --stat
 git log main..HEAD --oneline
 ```
 
-2. **Review file by file** — use `read_file` on changed files for full context, and the diff to see what changed:
+2. **Review file by file** — use `hermes_file_read` on workspace-relative
+   changed files for full context, and the diff to see what changed:
 
 ```bash
 git diff main...HEAD -- src/auth/login.py
@@ -138,30 +135,12 @@ gh pr diff 123 --name-only
 **With git + curl:**
 
 ```bash
-PR_NUMBER=123
-
-# Get PR details
-curl -s \
-  -H "Authorization: token $GITHUB_TOKEN" \
-  https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER \
-  | python3 -c "
-import sys, json
-pr = json.load(sys.stdin)
-print(f\"Title: {pr['title']}\")
-print(f\"Author: {pr['user']['login']}\")
-print(f\"Branch: {pr['head']['ref']} -> {pr['base']['ref']}\")
-print(f\"State: {pr['state']}\")
-print(f\"Body:\n{pr['body']}\")"
-
-# List changed files
-curl -s \
-  -H "Authorization: token $GITHUB_TOKEN" \
-  https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER/files \
-  | python3 -c "
-import sys, json
-for f in json.load(sys.stdin):
-    print(f\"{f['status']:10} +{f['additions']:-4} -{f['deletions']:-4}  {f['filename']}\")"
+bash -c 'set -eu; . "$1"; PR_REF="$2"; if [[ "$PR_REF" =~ ^https://github\.com/([^/]+)/([^/]+)/pull/([0-9]+)(/.*)?$ ]]; then GH_OWNER=${BASH_REMATCH[1]}; GH_REPO=${BASH_REMATCH[2]}; PR_NUMBER=${BASH_REMATCH[3]}; else PR_NUMBER=$PR_REF; fi; : "${GITHUB_TOKEN:?GitHub token unavailable}"; : "${GH_OWNER:?GitHub owner unavailable; use a PR URL or GitHub origin}"; : "${GH_REPO:?GitHub repository unavailable; use a PR URL or GitHub origin}"; case "$PR_NUMBER" in *[!0-9]*|"") echo "Invalid PR number or URL: $PR_REF" >&2; exit 2;; esac; curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER"; curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER/files"' bash "/absolute/path/returned-by-hermes_skill_resource_path" "https://github.com/OWNER/REPO/pull/123"
 ```
+
+Keep the helper source and every API command in this one authenticated
+terminal call; later terminal calls do not retain `$GITHUB_TOKEN` or the
+`GH_*` variables.
 
 ### Check Out PR Locally for Full Review
 
@@ -172,7 +151,9 @@ This works with plain `git` — no `gh` needed:
 git fetch origin pull/123/head:pr-123
 git checkout pr-123
 
-# Now you can use read_file, search_files, run tests, etc.
+# After the authenticated fetch, use `hermes_file_read` for files and the
+# sanitized `hermes_terminal` for searches and tests. Do not run untrusted PR
+# code through `hermes_terminal_authenticated`.
 
 # View diff against the base branch
 git diff main...pr-123
@@ -197,7 +178,7 @@ gh pr comment 123 --body "Overall looks good, a few suggestions below."
 ```bash
 curl -s -X POST \
   -H "Authorization: token $GITHUB_TOKEN" \
-  https://api.github.com/repos/$OWNER/$REPO/issues/$PR_NUMBER/comments \
+  https://api.github.com/repos/$GH_OWNER/$GH_REPO/issues/$PR_NUMBER/comments \
   -d '{"body": "Overall looks good, a few suggestions below."}'
 ```
 
@@ -208,7 +189,7 @@ curl -s -X POST \
 ```bash
 HEAD_SHA=$(gh pr view 123 --json headRefOid --jq '.headRefOid')
 
-gh api repos/$OWNER/$REPO/pulls/123/comments \
+gh api repos/$GH_OWNER/$GH_REPO/pulls/123/comments \
   --method POST \
   -f body="This could be simplified with a list comprehension." \
   -f path="src/auth/login.py" \
@@ -223,12 +204,12 @@ gh api repos/$OWNER/$REPO/pulls/123/comments \
 # Get the head commit SHA
 HEAD_SHA=$(curl -s \
   -H "Authorization: token $GITHUB_TOKEN" \
-  https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER \
+  https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['sha'])")
 
 curl -s -X POST \
   -H "Authorization: token $GITHUB_TOKEN" \
-  https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER/comments \
+  https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER/comments \
   -d "{
     \"body\": \"This could be simplified with a list comprehension.\",
     \"path\": \"src/auth/login.py\",
@@ -253,12 +234,12 @@ gh pr review 123 --comment --body "Some suggestions, nothing blocking."
 ```bash
 HEAD_SHA=$(curl -s \
   -H "Authorization: token $GITHUB_TOKEN" \
-  https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER \
+  https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['sha'])")
 
 curl -s -X POST \
   -H "Authorization: token $GITHUB_TOKEN" \
-  https://api.github.com/repos/$OWNER/$REPO/pulls/$PR_NUMBER/reviews \
+  https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER/reviews \
   -d "{
     \"commit_id\": \"$HEAD_SHA\",
     \"event\": \"COMMENT\",
@@ -321,7 +302,7 @@ When the user asks you to "review the code" or "check before pushing":
 
 1. `git diff main...HEAD --stat` — see scope of changes
 2. `git diff main...HEAD` — read the full diff
-3. For each changed file, use `read_file` if you need more context
+3. For each changed file, use `hermes_file_read` if you need more context
 4. Apply the checklist above
 5. Present findings in the structured format (Critical / Warnings / Suggestions / Looks Good)
 6. If critical issues found, offer to fix them before the user pushes
@@ -334,9 +315,15 @@ When the user asks you to "review PR #N", "look at this PR", or gives you a PR U
 
 ### Step 1: Set up environment
 
+For PR interactions, first resolve the bundled helper with
+`hermes_skill_resource_path(name="github-auth", resource="scripts/gh-env.sh")`
+and run the source plus the consuming GitHub command in the same
+`hermes_terminal_authenticated` call. Terminal calls do not share shell
+variables. Do not use the package's path as a workspace-relative `scripts/`
+path.
+
 ```bash
-source "${HERMES_HOME:-$HOME/.hermes}/skills/github/github-auth/scripts/gh-env.sh"
-# Or run the inline setup block from the top of this skill
+bash -c 'set -eu; . "/absolute/path/returned-by-hermes_skill_resource_path"; gh pr view 123'
 ```
 
 ### Step 2: Gather PR context
@@ -365,7 +352,10 @@ curl -s -H "Authorization: token $GITHUB_TOKEN" \
 
 ### Step 3: Check out the PR locally
 
-This gives you full access to `read_file`, `search_files`, and the ability to run tests.
+Use `hermes_file_read` for files and the sanitized `hermes_terminal` with `rg`
+for searches and tests. Keep all repository inspection on those
+workspace-scoped tools; reserve `hermes_terminal_authenticated` for the fetch
+and GitHub API calls that actually need credentials.
 
 ```bash
 git fetch origin pull/$PR_NUMBER/head:pr-$PR_NUMBER
@@ -384,7 +374,8 @@ git diff main...HEAD --name-only
 git diff main...HEAD -- path/to/file.py
 ```
 
-For each changed file, use `read_file` to see full context around the changes — diffs alone can miss issues visible only with surrounding code.
+For each changed file, use `hermes_file_read` to see full context around the
+changes — diffs alone can miss issues visible only with surrounding code.
 
 ### Step 5: Run automated checks locally (if applicable)
 
@@ -416,6 +407,10 @@ gh pr review $PR_NUMBER --request-changes --body "Found a few issues — see inl
 ```
 
 **With curl — atomic review with multiple inline comments:**
+
+Treat the complete script below as the body of the same authenticated
+`bash -c` call that sources `gh-env.sh`; do not source it in an earlier call.
+
 ```bash
 HEAD_SHA=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
   https://api.github.com/repos/$GH_OWNER/$GH_REPO/pulls/$PR_NUMBER \

@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: github-auth
 description: "GitHub auth setup: HTTPS tokens, SSH keys, gh CLI login."
 version: 1.1.0
@@ -17,6 +18,10 @@ This skill sets up authentication so the agent can work with GitHub repositories
 
 - **`git` (always available)** — uses HTTPS personal access tokens or SSH keys
 - **`gh` CLI (if installed)** — richer GitHub API access with a simpler auth flow
+
+Run non-interactive checks and authenticated GitHub commands through
+`hermes_terminal_authenticated`. The user must complete `gh auth login`, token
+entry, or SSH key setup outside the tool; terminal stdin is closed.
 
 ## Detection Flow
 

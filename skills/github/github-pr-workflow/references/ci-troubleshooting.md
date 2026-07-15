@@ -27,7 +27,7 @@ ERROR tests/test_foo.py - ModuleNotFoundError
 
 **Diagnosis:**
 1. Find the test file and line number from the traceback
-2. Use `read_file` to read the failing test
+2. Use `hermes_file_read` to read the failing test
 3. Check if it's a logic error in the code or a stale test assertion
 4. Look for `ModuleNotFoundError` — usually a missing dependency in CI
 

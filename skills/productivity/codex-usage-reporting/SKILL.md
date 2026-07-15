@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: codex-usage-reporting
 description: Report current OpenAI Codex usage in the user's exact compact format.
 version: 1.1.0
@@ -14,6 +15,10 @@ metadata:
 ## Trigger
 
 Use whenever the user asks for Codex usage, utilization, quota, allowance, or `usage?`.
+
+Run `codex-usage` through `hermes_terminal_authenticated` so its local Codex
+authentication and configuration are visible. Do not run interactive login from
+the tool; the user must authenticate separately.
 
 ## Procedure
 

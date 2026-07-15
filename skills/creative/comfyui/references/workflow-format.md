@@ -62,7 +62,7 @@ warning and skips).
 
 ## Common Node Types and Their Controllable Parameters
 
-The full catalog lives in `scripts/_common.py` (`PARAM_PATTERNS` and
+ The full catalog lives in `$SKILL_DIR/scripts/_common.py` (`PARAM_PATTERNS` and
 `MODEL_LOADERS`). Highlights:
 
 ### Text Prompts
@@ -174,7 +174,7 @@ wf["5"]["inputs"]["width"] = 1024
 wf["5"]["inputs"]["height"] = 1024
 ```
 
-`scripts/extract_schema.py` automates discovering which node IDs/fields
+`$SKILL_DIR/scripts/extract_schema.py` automates discovering which node IDs/fields
 correspond to which user-facing parameters. It returns a `parameters` dict
 that `run_workflow.py` reads to inject values from `--args`.
 

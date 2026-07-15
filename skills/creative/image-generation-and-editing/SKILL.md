@@ -1,4 +1,5 @@
 ---
+requires_tools: [image_gen]
 name: image-generation-and-editing
 description: "Generate or edit images with clear language, source fidelity, and native file delivery."
 version: 1.0.0

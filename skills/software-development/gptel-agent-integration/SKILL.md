@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_memory]
 name: gptel-agent-integration
 description: Integrate gptel with local agent capabilities such as skill indexes, persistent memory, tool calling, and language-runtime bridges while preserving prompt-cache stability and security boundaries.
 version: 1.0.0
@@ -23,7 +24,7 @@ Prefer a thin gptel companion package over a fork of gptel:
 ```text
 gptel buffer
   -> stable system prompt: skill metadata + memory snapshot
-  -> model tool call: skill_view / memory / session_search / safe tools
+  -> model tool call: hermes_skill_view / hermes_memory / safe tools
   -> native Elisp implementation or a deliberately chosen external runtime
   -> tool result back to gptel
 ```
@@ -42,7 +43,7 @@ Use gptel's native extension points first:
 Implement progressive disclosure:
 
 1. Scan skill directories and expose only `name`, `description`, and category in the system prompt.
-2. Provide a `skill_view` tool that loads the complete `SKILL.md` only when the model selects it.
+2. Provide a `hermes_skill_view` tool that loads the complete `SKILL.md` only when the model selects it.
 3. Load referenced files on demand rather than injecting every `references/` file.
 4. Treat slash commands as an optional deterministic fast path; natural-language routing should use the model over the compact catalog.
 
@@ -54,7 +55,7 @@ Keep persistent memory separate from skills:
 
 - `MEMORY.md`: environment facts, project conventions, technical lessons.
 - `USER.md`: user preferences, communication style, and stable workflow expectations.
-- Session search: on-demand retrieval of detailed historical conversation, not always-on memory.
+- Conversation history is not searchable through a package-standard tool; use the current conversation and explicit files instead.
 
 Load a bounded memory snapshot at session start. Do not mutate the current system prompt after a memory write; persist the write immediately, but make the updated snapshot visible on the next session or through the live tool result. This preserves provider prefix caching.
 
@@ -93,7 +94,7 @@ Minimum checks for a native gptel integration:
 1. Byte-compile the Elisp package against the checked-out gptel source.
 2. Run an isolated ERT fixture and assert skill `name`, `description`, and category appear in the prompt.
 3. Assert the initial prompt contains memory/profile but not the full skill body.
-4. Call the registered `skill_view` tool and assert the full body plus source reference are returned.
+4. Call the registered `hermes_skill_view` tool and assert the full body plus source reference are returned.
 5. Exercise memory add/replace/remove and assert persistence, duplicate rejection, limits, and atomic replacement.
 6. Verify traversal inputs such as `../secret` fail.
 
@@ -101,7 +102,7 @@ Minimum checks for a native gptel integration:
 
 - Do not choose an external runtime by default when gptel already owns the configuration and execution environment; a source-script process per tool call can be slower and less coherent than native Elisp.
 - Do not reimplement the full agent core in Elisp just because gptel can execute Elisp tools.
-- Do not route natural-language requests with a category-name lookup; provide the catalog and let the model select `skill_view`.
+- Do not route natural-language requests with a category-name lookup; provide the catalog and let the model select `hermes_skill_view`.
 - Do not make memory writes modify `gptel-system-prompt` mid-session.
 - Do not start with terminal, delegation, cron, or background review before the read path is verified.
 - Do not claim the integration is complete when only the read-only MVP exists; list skipped capabilities explicitly.

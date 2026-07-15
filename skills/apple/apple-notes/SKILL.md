@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: apple-notes
 description: "Manage Apple Notes via memo CLI: create, search, edit."
 version: 1.0.0
@@ -80,11 +81,14 @@ memo notes -ex                    # Export to HTML/Markdown
 ## Limitations
 
 - Cannot edit notes containing images or attachments
-- Interactive prompts require terminal access (use pty=true if needed)
+- Interactive prompts are not available through gptel-hermes' non-PTY terminal;
+  ask the user to run those prompts manually.
 - macOS only — requires Apple Notes.app
 
 ## Rules
 
 1. Prefer Apple Notes when user wants cross-device sync (iPhone/iPad/Mac)
-2. Use the `memory` tool for agent-internal notes that don't need to sync
+2. Agent-internal notes that don't need to sync are optional; keep them in the
+   conversation or use an available memory integration when present. This is
+   not required for Apple Notes operations.
 3. Use the `obsidian` skill for Markdown-native knowledge management

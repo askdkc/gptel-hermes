@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: jupyter-live-kernel
 description: "Iterative Python via live Jupyter kernel (hamelnb)."
 version: 1.0.0
@@ -23,7 +24,7 @@ state incrementally, explore APIs, inspect DataFrames, or iterate on complex cod
 |------|----------|
 | **This skill** | Iterative exploration, state across steps, data science, ML, "let me try this and check" |
 | `execute_code` | One-shot scripts needing hermes tool access (web_search, file ops). Stateless. |
-| `terminal` | Shell commands, builds, installs, git, process management |
+| `hermes_terminal_authenticated` | Shell commands, installs, and persistent Jupyter process management |
 
 **Rule of thumb:** If you'd want a Jupyter notebook for the task, use this skill.
 
@@ -34,6 +35,10 @@ state incrementally, explore APIs, inspect DataFrames, or iterate on complex cod
 3. A Jupyter server must be running (see Setup below)
 
 ## Setup
+
+Run the setup and server commands through `hermes_terminal_authenticated`.
+The server, notebooks, and hamelnb checkout are persistent HOME state; the
+standard terminal creates a temporary HOME and cannot keep them across calls.
 
 The hamelnb script location:
 ```

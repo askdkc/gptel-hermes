@@ -1,9 +1,14 @@
 ---
+requires_tools: [delegate_task]
 name: dispatching-parallel-agents
 description: Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies
 ---
 
 # Dispatching Parallel Agents
+
+This skill requires an external `delegate_task` integration. It is not
+provided by gptel-hermes. If it is unavailable, do the tasks sequentially and
+do not claim that isolated parallel agents were dispatched.
 
 ## Overview
 
@@ -68,9 +73,9 @@ Each agent gets:
 Issue all three subagent dispatches in the same response — they run in parallel:
 
 ```text
-Subagent (general-purpose): "Fix agent-tool-abort.test.ts failures"
-Subagent (general-purpose): "Fix batch-completion-behavior.test.ts failures"
-Subagent (general-purpose): "Fix tool-approval-race-conditions.test.ts failures"
+delegate_task(goal="Fix agent-tool-abort.test.ts failures", context="...")
+delegate_task(goal="Fix batch-completion-behavior.test.ts failures", context="...")
+delegate_task(goal="Fix tool-approval-race-conditions.test.ts failures", context="...")
 # All three run concurrently.
 ```
 

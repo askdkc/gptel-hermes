@@ -170,7 +170,7 @@ td.par.colorg.expr = "int(absTime.seconds / 1000.0)"
 result = 'time ok'
 """)
 
-# Step 3: GLSL shader (write to /tmp, load from file)
+# Step 3: GLSL shader
 # td_execute_python script:
 td_execute_python(code="""
 root = op('/project1')
@@ -180,7 +180,6 @@ glsl.par.resolutionw = 1280
 glsl.par.resolutionh = 720
 
 sd = root.create(textDAT, 'shader_code')
-sd.text = open('/tmp/my_shader.glsl').read()
 glsl.par.pixeldat = sd
 
 # Wire: input 0 = time, input 1 = spectrum texture
@@ -188,6 +187,9 @@ op('/project1/time_driver').outputConnectors[0].connect(glsl.inputConnectors[0])
 op('/project1/spectrum_tex').outputConnectors[0].connect(glsl.inputConnectors[1])
 result = 'glsl ok'
 """)
+
+# Write the complete source after creating the DAT:
+td_write_dat(path="/project1/shader_code", text="<complete GLSL source>")
 
 # Step 4: Output + recorder
 # td_execute_python script:
@@ -655,7 +657,6 @@ glsl.par.outputresolution = 'custom'
 glsl.par.resolutionw = 1280; glsl.par.resolutionh = 720
 
 shader_dat = root.create(textDAT, 'shader_code')
-shader_dat.text = open('/tmp/shader.glsl').read()
 glsl.par.pixeldat = shader_dat
 
 # Wire: input 0=time, input 1=spectrum
@@ -673,6 +674,9 @@ result = 'network built'
 ```
 
 **GLSL shader (reads spectrum from input 1 texture):**
+
+Write the following source with
+`td_write_dat(path="/project1/shader_code", text="<the GLSL source below>")`.
 
 ```glsl
 out vec4 fragColor;

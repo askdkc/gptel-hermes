@@ -1,4 +1,5 @@
 ---
+requires_tools: [web_extract, hermes_terminal]
 name: url-content-translation
 description: Translate the actual contents of a user-supplied URL, preserving structure and scope; optionally export the translation to a verified PDF or other document.
 ---

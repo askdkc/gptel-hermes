@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write, hermes_skill_resource_path, hermes_terminal]
 name: manim-video
 description: "Manim CE animations: 3Blue1Brown math/algo videos."
 version: 1.0.0
@@ -29,7 +30,11 @@ This is educational cinema. Every frame teaches. Every animation reveals structu
 
 ## Prerequisites
 
-Run `scripts/setup.sh` to verify all dependencies. Requires: Python 3.10+, Manim Community Edition v0.20+ (`pip install manim`), LaTeX (`texlive-full` on Linux, `mactex` on macOS), and ffmpeg. Reference docs tested against Manim CE v0.20.1.
+Resolve `scripts/setup.sh` with `hermes_skill_resource_path` and run its
+returned absolute `Effective path` through `hermes_terminal` to verify all
+dependencies. Requires: Python 3.10+, Manim Community Edition v0.20+
+(`pip install manim`), LaTeX (`texlive-full` on Linux, `mactex` on macOS), and
+ffmpeg. Reference docs tested against Manim CE v0.20.1.
 
 ## Modes
 

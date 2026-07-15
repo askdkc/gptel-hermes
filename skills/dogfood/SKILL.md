@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, browser_navigate, browser_snapshot, browser_console, browser_vision, browser_click, browser_type, browser_press, browser_scroll]
 name: dogfood
 description: "Exploratory QA of web apps: find bugs, evidence, reports."
 version: 1.0.0
@@ -118,7 +119,9 @@ For every issue found:
 
 ### Phase 5: Report
 
-Generate the final report using the template at `templates/dogfood-report-template.md`.
+Load the final report template with
+`hermes_skill_view(name="dogfood", resource="templates/dogfood-report-template.md")`
+before generating the report.
 
 The report must include:
 1. **Executive summary** with total issue count, breakdown by severity, and testing scope

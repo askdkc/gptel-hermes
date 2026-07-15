@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_read, hermes_file_write, hermes_terminal]
 name: llm-wiki
 description: "Karpathy's LLM Wiki: build/query interlinked markdown KB."
 version: 2.1.0
@@ -35,13 +36,10 @@ Use this skill when the user:
 
 ## Wiki Location
 
-**Location:** Set via `WIKI_PATH` environment variable (e.g. in `${HERMES_HOME:-~/.hermes}/.env`).
-
-If unset, defaults to `~/wiki`.
-
-```bash
-WIKI="${WIKI_PATH:-$HOME/wiki}"
-```
+**Location:** Set `WIKI_PATH` to a directory relative to the current workspace.
+If unset, use `wiki/`. The standard Hermes file tools are workspace-scoped, so
+an outside vault must first be exposed through an explicit external integration
+or moved into the workspace.
 
 The wiki is just a directory of markdown files — open it in Obsidian, VS Code, or
 any editor. No database, no special tooling required.
@@ -78,11 +76,10 @@ When the user has an existing wiki, **always orient yourself before doing anythi
 ③ **Scan recent `log.md`** — read the last 20-30 entries to understand recent activity.
 
 ```bash
-WIKI="${WIKI_PATH:-$HOME/wiki}"
-# Orientation reads at session start
-read_file "$WIKI/SCHEMA.md"
-read_file "$WIKI/index.md"
-read_file "$WIKI/log.md" offset=<last 30 lines>
+# Resolve WIKI_PATH to a concrete workspace-relative path before these calls.
+hermes_file_read(path="wiki/SCHEMA.md")
+hermes_file_read(path="wiki/index.md")
+hermes_terminal(program="tail", arguments=["-n", "30", "wiki/log.md"])
 ```
 
 Only after orientation should you ingest, query, or lint. This prevents:
@@ -91,14 +88,14 @@ Only after orientation should you ingest, query, or lint. This prevents:
 - Contradicting the schema's conventions
 - Repeating work already logged
 
-For large wikis (100+ pages), also run a quick `search_files` for the topic
-at hand before creating anything new.
+For large wikis (100+ pages), also run a quick `rg` search through
+`hermes_terminal` before creating anything new.
 
 ## Initializing a New Wiki
 
 When the user asks to create or start a wiki:
 
-1. Determine the wiki path (from `$WIKI_PATH` env var, or ask the user; default `~/wiki`)
+1. Determine the workspace-relative wiki path (from `WIKI_PATH`, or ask the user; default `wiki/`)
 2. Create the directory structure above
 3. Ask the user what domain the wiki covers — be specific
 4. Write `SCHEMA.md` customized to the domain (see template below)
@@ -259,8 +256,10 @@ a `_meta/topic-map.md` that groups pages by theme for faster navigation.
 When the user provides a source (URL, file, paste), integrate it into the wiki:
 
 ① **Capture the raw source:**
-   - URL → use `web_extract` to get markdown, save to `raw/articles/`
-   - PDF → use `web_extract` (handles PDFs), save to `raw/papers/`
+   - URL → use optional `web_extract` to get markdown, save to `raw/articles/`;
+     if unavailable, ask for extracted content or a local file
+   - PDF → use optional `web_extract` (handles PDFs), save to `raw/papers/`;
+     if unavailable, ask for extracted content or a local file
    - Pasted text → save to appropriate `raw/` subdirectory
    - Name the file descriptively: `raw/articles/karpathy-llm-wiki-2026.md`
    - **Add raw frontmatter** (`source_url`, `ingested`, `sha256` of the body).
@@ -271,8 +270,8 @@ When the user provides a source (URL, file, paste), integrate it into the wiki:
 ② **Discuss takeaways** with the user — what's interesting, what matters for
    the domain. (Skip this in automated/cron contexts — proceed directly.)
 
-③ **Check what already exists** — search index.md and use `search_files` to find
-   existing pages for mentioned entities/concepts. This is the difference between
+③ **Check what already exists** — read `index.md` and use `hermes_terminal` with
+`rg` to find existing pages for mentioned entities/concepts. This is the difference between
    a growing wiki and a pile of duplicates.
 
 ④ **Write or update wiki pages:**
@@ -305,9 +304,9 @@ and desired — it's the compounding effect.
 When the user asks a question about the wiki's domain:
 
 ① **Read `index.md`** to identify relevant pages.
-② **For wikis with 100+ pages**, also `search_files` across all `.md` files
+② **For wikis with 100+ pages**, also use `hermes_terminal` with `rg` across all `.md` files
    for key terms — the index alone may miss relevant content.
-③ **Read the relevant pages** using `read_file`.
+③ **Read the relevant pages** using `hermes_file_read`.
 ④ **Synthesize an answer** from the compiled knowledge. Cite the wiki pages
    you drew from: "Based on [[page-a]] and [[page-b]]..."
 ⑤ **File valuable answers back** — if the answer is a substantial comparison,
@@ -321,7 +320,8 @@ When the user asks to lint, health-check, or audit the wiki:
 
 ① **Orphan pages:** Find pages with no inbound `[[wikilinks]]` from other pages.
 ```python
-# Use execute_code for this — programmatic scan across all wiki pages
+# Run this as a one-shot Python program through hermes_terminal; the
+# pseudocode below describes the programmatic scan across all wiki pages.
 import os, re
 from collections import defaultdict
 wiki = "<WIKI_PATH>"
@@ -371,16 +371,16 @@ wiki = "<WIKI_PATH>"
 
 ```bash
 # Find pages by content
-search_files "transformer" path="$WIKI" file_glob="*.md"
+hermes_terminal(program="rg", arguments=["transformer", "wiki", "--glob", "*.md"])
 
 # Find pages by filename
-search_files "*.md" target="files" path="$WIKI"
+hermes_terminal(program="rg", arguments=["--files", "wiki", "--glob", "*.md"])
 
 # Find pages by tag
-search_files "tags:.*alignment" path="$WIKI" file_glob="*.md"
+hermes_terminal(program="rg", arguments=["tags:.*alignment", "wiki", "--glob", "*.md"])
 
 # Recent activity
-read_file "$WIKI/log.md" offset=<last 20 lines>
+hermes_terminal(program="tail", arguments=["-n", "20", "wiki/log.md"])
 ```
 
 ### Bulk Ingest
@@ -436,7 +436,7 @@ ob login --email <email> --password '<password>'
 ob sync-create-remote --name "LLM Wiki"
 
 # Connect the wiki directory to the vault
-cd ~/wiki
+cd wiki
 ob sync-setup --vault "<vault-id>"
 
 # Initial sync
@@ -448,7 +448,7 @@ ob sync --continuous
 
 **Continuous background sync via systemd:**
 ```ini
-# ~/.config/systemd/user/obsidian-wiki-sync.service
+# the user's systemd user-unit directory/obsidian-wiki-sync.service
 [Unit]
 Description=Obsidian LLM Wiki Sync
 After=network-online.target
@@ -456,7 +456,7 @@ Wants=network-online.target
 
 [Service]
 ExecStart=/path/to/ob sync --continuous
-WorkingDirectory=/home/user/wiki
+WorkingDirectory=/path/to/wiki
 Restart=on-failure
 RestartSec=10
 
@@ -471,7 +471,7 @@ systemctl --user enable --now obsidian-wiki-sync
 sudo loginctl enable-linger $USER
 ```
 
-This lets the agent write to `~/wiki` on a server while you browse the same
+This lets the agent write to `wiki` on a server while you browse the same
 vault in Obsidian on your laptop/phone — changes appear within seconds.
 
 ## Pitfalls

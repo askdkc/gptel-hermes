@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal, hermes_file_read, delegate_task]
 name: requesting-code-review
 description: "Pre-commit review: security scan, quality gates, auto-fix."
 version: 2.0.0

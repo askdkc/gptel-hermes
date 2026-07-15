@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_skill_resource_path, hermes_terminal_authenticated]
 name: github-repo-management
 description: "Clone/create/fork repos; manage remotes, releases."
 version: 1.1.0
@@ -14,6 +15,15 @@ metadata:
 # GitHub Repository Management
 
 Create, clone, fork, configure, and manage GitHub repositories. Each section shows `gh` first, then the `git` + `curl` fallback.
+
+Load `references/github-api-cheatsheet.md` with `hermes_skill_view` when using
+the REST examples. That reference resolves the bundled `gh-env.sh` helper with
+`hermes_skill_resource_path` before sourcing it through the authenticated
+terminal.
+
+Run commands below through `hermes_terminal_authenticated`. The user must
+complete any interactive GitHub login or token setup outside the tool; terminal
+stdin is closed.
 
 ## Prerequisites
 

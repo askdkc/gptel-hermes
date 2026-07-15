@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_terminal_authenticated]
 name: company-site-sync-workflows
 description: Use for recurring company website update/sync/deploy tasks where the user refers to a site by short name. Look up the site-specific reference, run the exact recorded workflow, and report real command output succinctly.
 version: 1.0.0
@@ -18,6 +19,10 @@ This class-level skill covers small recurring website update/sync workflows for 
 
 Use this instead of creating one narrow skill per site. Store site-specific commands and paths in `references/<site>.md`.
 
+Run the recorded external-site workflow through
+`hermes_terminal_authenticated`; it uses a real absolute checkout and a
+persistent user-owned script outside the workspace.
+
 ## When to Use
 
 Use when the user says things like:
@@ -34,10 +39,14 @@ Known references:
 ## Procedure
 
 1. Identify the site short name from the user's request.
-2. Read the matching `references/<site>.md` if available.
-3. Run the exact workflow from the reference, including the recorded working directory.
+2. Load the matching resource with
+   `hermes_skill_view(name="company-site-sync-workflows", resource="references/<site>.md")`
+   if available.
+3. Run the exact workflow from the reference, including the recorded checkout path.
 4. Use a chained command when appropriate so later deploy/sync steps do not run after a failed prerequisite, e.g. `pwd && git pull && <sync-script>`.
-5. Do not rely on shell state from previous turns; always set `workdir` explicitly.
+5. Do not rely on shell state from previous turns. For an external absolute
+   checkout, `cd` to the recorded path inside the shell command; use `cwd` only
+   for a workspace-relative checkout.
 6. Report only real command output and the actual exit status.
 
 ## Reporting
@@ -59,7 +68,7 @@ Keep the reply short and operational. Include:
 ## Verification Checklist
 
 - [ ] Site-specific reference was used.
-- [ ] Command ran with the recorded `workdir`.
+- [ ] Command ran from the recorded checkout path.
 - [ ] Git output is included or summarized.
 - [ ] Sync/deploy command completed with exit code `0`.
 - [ ] Final reply is in Japanese unless the user requested otherwise.

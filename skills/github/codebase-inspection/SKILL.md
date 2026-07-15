@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: codebase-inspection
 description: "Inspect codebases w/ pygount: LOC, languages, ratios."
 version: 1.0.0

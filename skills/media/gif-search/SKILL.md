@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: gif-search
 description: "Search/download GIFs from Tenor via curl + jq."
 version: 1.1.0
@@ -17,17 +18,17 @@ metadata:
 
 Search and download GIFs directly via the Tenor API using curl. No extra tools needed.
 
+Run the curl commands below through `hermes_terminal_authenticated`; the API key
+must already be present in Emacs's environment. The tool does not source `.env`.
+
 ## When to use
 
 Useful for finding reaction GIFs, creating visual content, and sending GIFs in chat.
 
 ## Setup
 
-Set your Tenor API key in your environment (add to `${HERMES_HOME:-~/.hermes}/.env`):
-
-```bash
-TENOR_API_KEY=your_key_here
-```
+Export `TENOR_API_KEY` before starting Emacs, or set it in Emacs with
+`(setenv "TENOR_API_KEY" "your_key_here")`. Never commit a real key.
 
 Get a free API key at https://developers.google.com/tenor/guides/quickstart — the Google Cloud Console Tenor API key is free and has generous rate limits.
 

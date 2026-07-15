@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: evaluating-llms-harness
 description: "lm-eval-harness: benchmark LLMs (MMLU, GSM8K, etc.)."
 version: 1.0.0
@@ -13,6 +14,24 @@ metadata:
 ---
 
 # lm-evaluation-harness - LLM Benchmarking
+
+For API-backed evaluations, set the provider key in Emacs before using
+`hermes_terminal_authenticated`; `read-passwd` keeps it out of prompts,
+workspace files, and command output:
+
+```elisp
+(progn
+  (setenv "OPENAI_API_KEY" (read-passwd "OpenAI API key: "))
+  nil)
+```
+
+For Anthropic, evaluate this instead:
+
+```elisp
+(progn
+  (setenv "ANTHROPIC_API_KEY" (read-passwd "Anthropic API key: "))
+  nil)
+```
 
 ## What's inside
 
@@ -493,6 +512,3 @@ lm_eval --model hf \
 - Docs: https://github.com/EleutherAI/lm-evaluation-harness/tree/main/docs
 - Task library: 60+ tasks including MMLU, GSM8K, HumanEval, TruthfulQA, HellaSwag, ARC, WinoGrande, etc.
 - Leaderboard: https://huggingface.co/spaces/HuggingFaceH4/open_llm_leaderboard (uses this harness)
-
-
-

@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write]
 name: design-md
 description: Author/validate/export Google's DESIGN.md token spec files.
 version: 1.0.0
@@ -130,7 +131,8 @@ if the value type is valid. Unknown component properties produce a warning.
 1. **Ask the user** (or infer) the brand tone, accent color, and typography
    direction. If they provided a site, image, or vibe, translate it to the
    token shape above.
-2. **Write `DESIGN.md`** in their project root using `write_file`. Always
+2. **Write `DESIGN.md`** in the workspace project root using
+   `hermes_file_write` with `mode: "create"`. Always
    include `name:` and `colors:`; other sections optional but encouraged.
 3. **Use token references** (`{colors.primary}`) in the `components:` section
    instead of re-typing hex values. Keeps the palette single-source.

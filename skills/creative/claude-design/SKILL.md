@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write, browser_vision]
 name: claude-design
 description: Design one-off HTML artifacts (landing, deck, prototype).
 version: 1.1.0

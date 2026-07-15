@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_org_agenda, hermes_org_task]
 name: org-task
 description: Manage tasks whose source of truth is the current Emacs Org agenda, including agenda-aware readouts, custom TODO states, confirmed state changes, and Org capture. Use when reviewing, updating, or capturing tasks in Org files through gptel-hermes.
 ---
@@ -22,8 +23,9 @@ the dedicated gptel-hermes Org tools.
 
 ## Scope and configuration
 
-- Read only files resolved from `org-agenda-files`. Do not scan `~/org`, the
-  home directory, or arbitrary files with terminal or generic file tools.
+- Read only files resolved from `org-agenda-files`. Do not scan an inferred
+  home-directory Org folder, the home directory, or arbitrary files with
+  terminal or generic file tools.
 - Resolve `org-agenda-files` on every tool call; do not cache its value.
 - If it is empty, report that the Org task scope is unconfigured. Do not infer
   a directory. An explicit fallback may be enabled by the user with:

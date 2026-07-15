@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal, hermes_skill_resource_path]
 name: arxiv
 description: "Search arXiv papers by keyword, author, category, or ID."
 version: 1.0.0
@@ -21,8 +22,8 @@ Search and retrieve academic papers from arXiv via their free REST API. No API k
 |--------|---------|
 | Search papers | `curl "https://export.arxiv.org/api/query?search_query=all:QUERY&max_results=5"` |
 | Get specific paper | `curl "https://export.arxiv.org/api/query?id_list=2402.03300"` |
-| Read abstract (web) | `web_extract(urls=["https://arxiv.org/abs/2402.03300"])` |
-| Read full paper (PDF) | `web_extract(urls=["https://arxiv.org/pdf/2402.03300"])` |
+| Read abstract (web) | Optional `web_extract` integration, or `curl` through `hermes_terminal` |
+| Read full paper (PDF) | Optional `web_extract` integration, or download with `curl` |
 
 ## Searching Papers
 
@@ -147,13 +148,9 @@ print('}')
 
 After finding a paper, read it:
 
-```
-# Abstract page (fast, metadata + abstract)
-web_extract(urls=["https://arxiv.org/abs/2402.03300"])
-
-# Full paper (PDF → markdown via Firecrawl)
-web_extract(urls=["https://arxiv.org/pdf/2402.03300"])
-```
+Use the optional `web_extract` integration for the abstract page or PDF when
+it is available. Otherwise fetch the URL with `curl` through the terminal and
+use the local PDF/text extraction workflow below.
 
 For local PDF processing, see the `ocr-and-documents` skill.
 
@@ -174,15 +171,17 @@ Full list: https://arxiv.org/category_taxonomy
 
 ## Helper Script
 
-The `scripts/search_arxiv.py` script handles XML parsing and provides clean output:
+The bundled `scripts/search_arxiv.py` handles XML parsing and provides clean
+output. Resolve it with `hermes_skill_resource_path` and use its returned
+absolute `Effective path` in each terminal call:
 
 ```bash
-python scripts/search_arxiv.py "GRPO reinforcement learning"
-python scripts/search_arxiv.py "transformer attention" --max 10 --sort date
-python scripts/search_arxiv.py --author "Yann LeCun" --max 5
-python scripts/search_arxiv.py --category cs.AI --sort date
-python scripts/search_arxiv.py --id 2402.03300
-python scripts/search_arxiv.py --id 2402.03300,2401.12345
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" "GRPO reinforcement learning"
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" "transformer attention" --max 10 --sort date
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" --author "Yann LeCun" --max 5
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" --category cs.AI --sort date
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" --id 2402.03300
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" --id 2402.03300,2401.12345
 ```
 
 No dependencies — uses only Python stdlib.
@@ -243,10 +242,14 @@ curl -s "https://api.semanticscholar.org/graph/v1/author/search?query=Yann+LeCun
 
 ## Complete Research Workflow
 
-1. **Discover**: `python scripts/search_arxiv.py "your topic" --sort date --max 10`
+1. **Discover**: resolve `scripts/search_arxiv.py` with
+   `hermes_skill_resource_path`, then run it with `python3` and its returned
+   absolute path.
 2. **Assess impact**: `curl -s "https://api.semanticscholar.org/graph/v1/paper/arXiv:ID?fields=citationCount,influentialCitationCount"`
-3. **Read abstract**: `web_extract(urls=["https://arxiv.org/abs/ID"])`
-4. **Read full paper**: `web_extract(urls=["https://arxiv.org/pdf/ID"])`
+3. **Read abstract**: use the optional `web_extract` integration when
+   available; otherwise fetch the abstract URL with `curl`.
+4. **Read full paper**: use the optional `web_extract` integration when
+   available; otherwise download the PDF with `curl` and use local extraction.
 5. **Find related work**: `curl -s "https://api.semanticscholar.org/graph/v1/paper/arXiv:ID/references?fields=title,citationCount&limit=20"`
 6. **Get recommendations**: POST to Semantic Scholar recommendations endpoint
 7. **Track authors**: `curl -s "https://api.semanticscholar.org/graph/v1/author/search?query=NAME"`

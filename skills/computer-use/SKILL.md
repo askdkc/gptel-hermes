@@ -1,4 +1,5 @@
 ---
+requires_tools: [computer_use, hermes_file_read, hermes_file_write, hermes_apply_patch, hermes_terminal]
 name: computer-use
 description: |
   Drive the user's desktop in the background — clicking, typing,
@@ -172,8 +173,9 @@ automatically.
 When the user is on a messaging platform (Telegram, Discord, etc.) and
 you took a screenshot they should see, save it somewhere durable and
 use `MEDIA:/absolute/path.png` in your reply. cua-driver's screenshots
-are PNG or JPEG bytes (mimeType is on the response); write them out
-with `write_file` or the terminal (`base64 -d`).
+are PNG or JPEG bytes (mimeType is on the response). Return those bytes as
+an image result or use a dedicated binary media writer; standard text file
+tools are not a safe place to store arbitrary image bytes.
 
 On CLI, you can just describe what you see — the screenshot data stays
 in your conversation context.
@@ -218,9 +220,10 @@ in your conversation context.
   needs the user's actual native apps (Finder/Explorer/Files, Mail/
   Outlook/Thunderbird, native chat clients, Figma, Logic, games,
   anything non-web).
-- **File edits** — use `read_file` / `write_file` / `patch`, not
+- **File edits** — use `hermes_file_read` / `hermes_file_write` /
+  `hermes_apply_patch`, not
   `type` into an editor window.
-- **Shell commands** — use `terminal`, not `type` into Terminal.app /
+- **Shell commands** — use `hermes_terminal`, not `type` into Terminal.app /
   Windows Terminal / gnome-terminal.
 
 ## Going deeper — read the cua-driver skill pack

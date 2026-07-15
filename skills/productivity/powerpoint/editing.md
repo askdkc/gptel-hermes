@@ -1,15 +1,24 @@
 # Editing Presentations
 
+The helper scripts are bundled package resources, not workspace-relative
+files. Before using `add_slide.py` or `clean.py`, resolve it with
+`hermes_skill_resource_path(name="powerpoint", resource="scripts/add_slide.py")`
+or the corresponding resource and substitute the returned absolute path.
+Set `SKILL_DIR` to the returned `Skill directory`, not the directory containing
+the resource file, for the shell examples.
+
 ## Template-Based Workflow
 
 When using an existing presentation as a template:
 
 1. **Analyze existing slides**:
    ```bash
-   python scripts/thumbnail.py template.pptx
+   mkdir -p thumbnails
+   soffice --headless --convert-to pdf --outdir thumbnails template.pptx
+   pdftoppm -jpeg -r 120 thumbnails/template.pdf thumbnails/slide
    python -m markitdown template.pptx
    ```
-   Review `thumbnails.jpg` to see layouts, and markitdown output to see placeholder text.
+   Review the generated `slide-*.jpg` files to see layouts, and markitdown output to see placeholder text.
 
 2. **Plan slide mapping**: For each content section, choose a template slide.
 
@@ -26,20 +35,32 @@ When using an existing presentation as a template:
 
    Match content type to layout style (e.g., key points → bullet slide, team info → multi-column, testimonials → quote slide).
 
-3. **Unpack**: `python scripts/office/unpack.py template.pptx unpacked/`
+3. **Unpack**: require a fresh destination so files from another deck cannot
+   enter this presentation:
+   `test ! -e unpacked && mkdir unpacked && unzip -q template.pptx -d unpacked/`
 
 4. **Build presentation** (do this yourself, not with subagents):
    - Delete unwanted slides (remove from `<p:sldIdLst>`)
-   - Duplicate slides you want to reuse (`add_slide.py`)
+   - Duplicate slides you want to reuse with the resolved `add_slide.py` path
    - Reorder slides in `<p:sldIdLst>`
    - **Complete all structural changes before step 5**
 
 5. **Edit content**: Update text in each `slide{N}.xml`.
    **Use subagents here if available** — slides are separate XML files, so subagents can edit in parallel.
 
-6. **Clean**: `python scripts/clean.py unpacked/`
+6. **Clean**: `python3 "$SKILL_DIR"/scripts/clean.py unpacked/`
 
-7. **Pack**: `python scripts/office/pack.py unpacked/ output.pptx --original template.pptx`
+7. **Pack** into a fresh archive so deleted entries cannot survive a repack:
+   ```bash
+   set -e
+   tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/powerpoint.XXXXXX")"
+   tmp="$tmpdir/output.pptx"
+   trap 'rm -f "$tmp"; rmdir "$tmpdir"' EXIT
+   (cd unpacked && zip -qr "$tmp" .)
+   mv "$tmp" output.pptx
+   trap - EXIT
+   rmdir "$tmpdir"
+   ```
 
 ---
 
@@ -47,25 +68,18 @@ When using an existing presentation as a template:
 
 | Script | Purpose |
 |--------|---------|
-| `unpack.py` | Extract and pretty-print PPTX |
 | `add_slide.py` | Duplicate slide or create from layout |
 | `clean.py` | Remove orphaned files |
-| `pack.py` | Repack with validation |
-| `thumbnail.py` | Create visual grid of slides |
 
-### unpack.py
-
-```bash
-python scripts/office/unpack.py input.pptx unpacked/
-```
-
-Extracts PPTX, pretty-prints XML, escapes smart quotes.
+Use `unzip` to extract the package and `zip` to repack it. The old
+`unpack.py` and `thumbnail.py` examples are not bundled here. Although a
+`pack.py` file exists, its validator module is not bundled, so use `zip`.
 
 ### add_slide.py
 
 ```bash
-python scripts/add_slide.py unpacked/ slide2.xml      # Duplicate slide
-python scripts/add_slide.py unpacked/ slideLayout2.xml # From layout
+python3 "$SKILL_DIR"/scripts/add_slide.py unpacked/ slide2.xml      # Duplicate slide
+python3 "$SKILL_DIR"/scripts/add_slide.py unpacked/ slideLayout2.xml # From layout
 ```
 
 Prints `<p:sldId>` to add to `<p:sldIdLst>` at desired position.
@@ -73,28 +87,13 @@ Prints `<p:sldId>` to add to `<p:sldIdLst>` at desired position.
 ### clean.py
 
 ```bash
-python scripts/clean.py unpacked/
+python3 "$SKILL_DIR"/scripts/clean.py unpacked/
 ```
 
 Removes slides not in `<p:sldIdLst>`, unreferenced media, orphaned rels.
 
-### pack.py
-
-```bash
-python scripts/office/pack.py unpacked/ output.pptx --original input.pptx
-```
-
-Validates, repairs, condenses XML, re-encodes smart quotes.
-
-### thumbnail.py
-
-```bash
-python scripts/thumbnail.py input.pptx [output_prefix] [--cols N]
-```
-
-Creates `thumbnails.jpg` with slide filenames as labels. Default 3 columns, max 12 per grid.
-
-**Use for template analysis only** (choosing layouts). For visual QA, use `soffice` + `pdftoppm` to create full-resolution individual slide images—see SKILL.md.
+For visual analysis and QA, use `soffice` + `pdftoppm` to create individual
+slide images as shown in `SKILL.md`.
 
 ---
 

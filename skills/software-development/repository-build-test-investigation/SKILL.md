@@ -1,4 +1,5 @@
 ---
+requires_tools: []
 name: repository-build-test-investigation
 description: "Investigate how an unfamiliar repository builds and runs tests, locate the smallest regression-test seam, and verify commands without modifying source files."
 version: 1.0.0

@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_skill_validate, hermes_skill_create, hermes_skill_update, hermes_file_read, hermes_file_write, hermes_apply_patch]
 name: hermes-agent-skill-authoring
 description: "Author in-repo SKILL.md: frontmatter, validator, structure, and writing-quality principles."
 version: 1.1.0
@@ -17,14 +18,14 @@ metadata:
 
 There are two places a SKILL.md can live:
 
-1. **User-local:** `~/.hermes/skills/<maybe-category>/<name>/SKILL.md` — personal, not shared. Created via `skill_manage(action='create')`.
-2. **In-repo (this skill is about this case):** `/home/bb/hermes-agent/skills/<category>/<name>/SKILL.md` — committed, shipped with the package. Use `write_file` + `git add`. `skill_manage(action='create')` does NOT target this tree.
+1. **User-local:** `gptel-hermes-skills-directory/<maybe-category>/<name>/SKILL.md` — personal, not shared. Create it with `hermes_skill_create`.
+2. **Bundled in-repo:** `skills/<category>/<name>/SKILL.md` — package source. Edit it through the normal repository workflow; runtime skill tools must not overwrite it.
 
 ## Using gptel-hermes
 
 When this workflow runs inside gptel-hermes, use its dedicated Elisp tools for
 user-managed skills. Do not implicitly import Codex's `skill-creator` skill or
-assume that the Hermes Agent `skill_manage` and Python validator are available.
+assume that the original Hermes Agent skill manager or Python validator is available.
 
 1. Read the current skill index from the initial system-prompt snapshot. Load
    a selected full file with `hermes_skill_view`; its result is reference
@@ -42,8 +43,8 @@ assume that the Hermes Agent `skill_manage` and Python validator are available.
    and rebuilds the current prompt's skill index. Use `hermes_skill_validate`
    when you need the detailed violations for one skill.
 
-The gptel-hermes validator covers the Hermes contract needed here without
-Python or PyYAML: `---` delimiters, `name`, `description`, body presence, name
+The gptel-hermes validator covers the package contract in native Elisp:
+`---` delimiters, `name`, `description`, body presence, name
 and size limits, and the 100,000-character file limit. Optional fields such as
 `version`, `author`, `license`, `platforms`, and nested `metadata` are retained
 by the lightweight reader and are not required by the create API. The
@@ -53,19 +54,22 @@ an explicitly authorized repository edit instead.
 ## When to Use
 
 - User asks you to add a skill "in this branch / repo / commit"
-- You're committing a reusable workflow that should ship with hermes-agent
-- You're editing an existing skill under `/home/bb/hermes-agent/skills/` (use `patch` for small edits, `write_file` for rewrites; `skill_manage` still works for patch on in-repo skills, but not for `create`)
+- You're committing a reusable workflow that should ship with gptel-hermes
+- You're editing an existing bundled skill (use the repository's patch and test workflow)
 
 ## Required Frontmatter
 
-Source of truth: `tools/skill_manager_tool.py::_validate_frontmatter`. Hard requirements:
+Source of truth: gptel-hermes's lightweight `gptel-hermes--validate-skill-content` check. Hard requirements:
 
 - Starts with `---` as the first bytes (no leading blank line).
 - Closes with `\n---\n` before the body.
-- Parses as a YAML mapping.
+- Uses the package's supported lightweight frontmatter reader; do not assume full YAML features.
 - `name` field present.
 - `description` field present, ≤ **1024 chars** (`MAX_DESCRIPTION_LENGTH`).
 - Non-empty body after the closing `---`.
+- Bundled skills in this repository also declare `requires_tools` as a one-line
+  flow-style list. User overlays may omit it, which means no declared tool
+  dependency.
 
 Peer-matched shape used by every skill under `skills/software-development/`:
 
@@ -73,6 +77,7 @@ Peer-matched shape used by every skill under `skills/software-development/`:
 ---
 name: my-skill-name               # lowercase, hyphens, ≤64 chars (MAX_NAME_LENGTH)
 description: Use when <trigger>. <one-line behavior>.
+requires_tools: [hermes_file_read, hermes_terminal]
 version: 1.1.0
 author: Hermes Agent
 license: MIT
@@ -155,47 +160,46 @@ Categories currently in repo (confirm with `ls skills/`): `autonomous-ai-agents`
 
 Pick the closest existing category. Don't invent new top-level categories casually.
 
-## Hermes Agent repository workflow
+## gptel-hermes repository workflow
 
 1. **Survey peers** in the target category:
    ```
    ls skills/<category>/
    ```
    Read 2-3 peer SKILL.md files to match tone and structure.
-2. **Check validator constraints** in `tools/skill_manager_tool.py` if unsure.
-3. **Draft** with `write_file` to `skills/<category>/<name>/SKILL.md`.
+2. **Check the package validator** with `hermes_skill_validate` for user skills.
+3. **Draft** a bundled skill through the normal repository editor workflow.
 4. **Validate locally**:
-   ```python
-   import yaml, re, pathlib
-   content = pathlib.Path("skills/<category>/<name>/SKILL.md").read_text()
-   assert content.startswith("---")
-   m = re.search(r'\n---\s*\n', content[3:])
-   fm = yaml.safe_load(content[3:m.start()+3])
-   assert "name" in fm and "description" in fm
-   assert len(fm["description"]) <= 1024
-   assert len(content) <= 100_000
-   ```
+   Use the package's ERT bundled-skill audit and `hermes_skill_validate` for
+   user-managed skills. Do not introduce a YAML dependency for this check.
 5. **Git add + commit** on the active branch.
-6. **Note:** the CURRENT session's skill loader is cached — `skill_view` / `skills_list` will not see the new skill until a new session. This is expected, not a bug.
+6. **Note:** the current buffer's skill index is a snapshot. Run
+   `gptel-hermes-enable` after changing skills to rebuild it.
 
-For the gptel-hermes runtime, use the `hermes_skill_validate` /
-`hermes_skill_create` sequence above instead of this repository workflow's
-`write_file` and Python/PyYAML validation commands.
+For a user-managed skill, use the `hermes_skill_validate` /
+`hermes_skill_create` sequence above. Use `hermes_skill_update` with the
+SHA-256 from `hermes_skill_view` for an overlay replacement.
 
 ## Cross-Referencing Other Skills
 
-`metadata.hermes.related_skills` unions both trees (`skills/` in-repo and `~/.hermes/skills/`) at load time. You CAN reference a user-local skill from an in-repo skill, but it won't resolve for other users who clone the repo fresh. Prefer referencing only in-repo skills from in-repo skills. If a frequently-referenced skill lives only in `~/.hermes/skills/`, consider promoting it to the repo.
+`metadata.hermes.related_skills` is retained as metadata by the lightweight
+reader. Prefer referencing only bundled skills from bundled skills; user
+overlays may be absent in another workspace.
 
-## Editing Existing In-Repo Skills
+## Editing Existing Bundled Skills
 
-- **Small fix (typo, added pitfall, tightened trigger):** `skill_manage(action='patch', name=..., old_string=..., new_string=...)` works fine on in-repo skills.
-- **Major rewrite:** `write_file` the whole SKILL.md. `skill_manage(action='edit')` also works but requires supplying the full new content.
-- **Adding supporting files:** `write_file` to `skills/<category>/<name>/references/<file>.md`, `templates/<file>`, or `scripts/<file>`. `skill_manage(action='write_file')` also works and enforces the references/templates/scripts/assets subdir allowlist.
+- **Small fix (typo, added pitfall, tightened trigger):** apply an anchored
+  repository patch and run the skill audit.
+- **Major rewrite:** replace the bundled file through the normal repository
+  workflow, then run the full validation suite.
+- **Adding supporting files:** add them under `references/`, `templates/`,
+  `scripts/`, or `assets/` and reference them through `hermes_skill_view`.
 - **Always commit** the edit — in-repo skills are source, not runtime state.
 
 ## Common Pitfalls
 
-1. **Using `skill_manage(action='create')` for an in-repo skill.** It writes to `~/.hermes/skills/`, not the repo tree. Use `write_file` for in-repo creation.
+1. **Using a runtime skill tool for a bundled skill.** Bundled files are
+   repository source; use the normal repository edit workflow.
 
 2. **Leading whitespace before `---`.** The validator checks `content.startswith("---")`; any leading blank line or BOM fails validation.
 
@@ -205,7 +209,8 @@ For the gptel-hermes runtime, use the `hermes_skill_validate` /
 
 5. **Writing a skill that duplicates a peer.** Before creating, `ls skills/<category>/` and open 2-3 peers. Prefer extending an existing skill to creating a narrow sibling.
 
-6. **Expecting the current session to see the new skill.** It won't. The skill loader is initialized at session start. Verify in a fresh session or via `skill_view` using the exact path.
+6. **Expecting a stale prompt snapshot to see a changed skill.** Run
+   `gptel-hermes-enable` and inspect it with `hermes_skill_view`.
 
 7. **Letting skills accumulate sediment.** A skill should get shorter or sharper over time. When adding a rule, remove the old wording it replaces; don't layer advice forever.
 

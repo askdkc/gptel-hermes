@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_skill_resource_path, hermes_terminal, hermes_file_read, hermes_file_write, hermes_apply_patch, web_search, web_extract, delegate_task, process, execute_code, memory, skill_manage, todo, cronjob, clarify]
 name: research-paper-writing
 title: Research Paper Writing Pipeline
 description: "Write ML papers for NeurIPS/ICML/ICLR: design→submit."
@@ -246,7 +247,7 @@ find . -name "*.bib"
 
 ### Step 1.2: Search for Related Work
 
-**Load the `arxiv` skill** for structured paper discovery: `skill_view("arxiv")`. It provides arXiv REST API search, Semantic Scholar citation graphs, author profiles, and BibTeX generation.
+**Load the `arxiv` skill** for structured paper discovery: `hermes_skill_view(name="arxiv")`. It provides arXiv REST API search, Semantic Scholar citation graphs, author profiles, and BibTeX generation.
 
 Use `web_search` for broad discovery, `web_extract` for fetching specific papers:
 
@@ -1165,9 +1166,14 @@ Template Setup Checklist:
 
 **Step 1: Copy the Full Template**
 
+Resolve the bundled template directory first with
+`hermes_skill_resource_path(name="research-paper-writing", resource="templates/neurips2025/main.tex")`.
+Use the returned `Skill directory` as the source directory; do not assume a
+workspace-relative `templates/` directory.
+
 ```bash
-cp -r templates/neurips2025/ ~/papers/my-paper/
-cd ~/papers/my-paper/
+cp -r "/absolute/skill-directory-returned-by-hermes_skill_resource_path"/templates/neurips2025/ papers/my-paper/
+cd papers/my-paper/
 ls -la  # Should see: main.tex, neurips.sty, Makefile, etc.
 ```
 
@@ -1730,7 +1736,9 @@ When converting between venues, **never copy LaTeX preambles between templates**
 
 ```bash
 # 1. Start fresh with target template
-cp -r templates/icml2026/ new_submission/
+# Resolve templates/icml2026/example_paper.tex with hermes_skill_resource_path
+# and copy the returned Skill directory's templates/icml2026/ directory.
+cp -r "/absolute/skill-directory-returned-by-hermes_skill_resource_path"/templates/icml2026/ new_submission/
 
 # 2. Copy ONLY content sections (not preamble)
 #    - Abstract text, section content, figures, tables, bib entries
@@ -2026,12 +2034,12 @@ Compose this skill with other Hermes skills for specific phases:
 
 | Skill | When to Use | How to Load |
 |-------|-------------|-------------|
-| **arxiv** | Phase 1 (Literature Review): searching arXiv, generating BibTeX, finding related papers via Semantic Scholar | `skill_view("arxiv")` |
-| **subagent-driven-development** | Phase 5 (Drafting): parallel section writing with 2-stage review (spec compliance then quality) | `skill_view("subagent-driven-development")` |
-| **plan** | Phase 0 (Setup): creating structured plans before execution. Writes to `.hermes/plans/` | `skill_view("plan")` |
+| **arxiv** | Phase 1 (Literature Review): searching arXiv, generating BibTeX, finding related papers via Semantic Scholar | `hermes_skill_view(name="arxiv")` |
+| **subagent-driven-development** | Phase 5 (Drafting): parallel section writing with 2-stage review (spec compliance then quality) | `hermes_skill_view(name="subagent-driven-development")` |
+| **plan** | Phase 0 (Setup): creating structured plans before execution. Writes to `.hermes/plans/` | `hermes_skill_view(name="plan")` |
 | **qmd** | Phase 1 (Literature): searching local knowledge bases (notes, transcripts, docs) via hybrid BM25+vector search | Install: `skill_manage("install", "qmd")` |
-| **diagramming** | Phase 4-5: creating Excalidraw-based figures and architecture diagrams | `skill_view("diagramming")` |
-| **data-science** | Phase 4 (Analysis): Jupyter live kernel for interactive analysis and visualization | `skill_view("data-science")` |
+| **diagramming** | Phase 4-5: creating Excalidraw-based figures and architecture diagrams | `hermes_skill_view(name="diagramming")` |
+| **data-science** | Phase 4 (Analysis): Jupyter live kernel for interactive analysis and visualization | `hermes_skill_view(name="data-science")` |
 
 **This skill supersedes `ml-paper-writing`** — it contains all of ml-paper-writing's content plus the full experiment/analysis pipeline and autoreason methodology.
 
@@ -2039,10 +2047,10 @@ Compose this skill with other Hermes skills for specific phases:
 
 | Tool | Usage in This Pipeline |
 |------|----------------------|
-| **`terminal`** | LaTeX compilation (`latexmk -pdf`), git operations, launching experiments (`nohup python run.py &`), process checks |
+| **`hermes_terminal`** | LaTeX compilation, git operations, foreground experiments, process checks |
 | **`process`** | Background experiment management: `process("start", ...)`, `process("poll", pid)`, `process("log", pid)`, `process("kill", pid)` |
 | **`execute_code`** | Run Python for citation verification, statistical analysis, data aggregation. Has tool access via RPC. |
-| **`read_file`** / **`write_file`** / **`patch`** | Paper editing, experiment scripts, result files. Use `patch` for targeted edits to large .tex files. |
+| **`hermes_file_read`** / **`hermes_file_write`** / **`hermes_apply_patch`** | Paper editing, experiment scripts, result files. Use `hermes_apply_patch` for targeted edits to large .tex files. |
 | **`web_search`** | Literature discovery: `web_search("transformer attention mechanism 2024")` |
 | **`web_extract`** | Fetch paper content, verify citations: `web_extract("https://arxiv.org/abs/2303.17651")` |
 | **`delegate_task`** | **Parallel section drafting** — spawn isolated subagents for each section. Also for concurrent citation verification. |
@@ -2056,11 +2064,11 @@ Compose this skill with other Hermes skills for specific phases:
 
 **Experiment monitoring** (most common):
 ```
-terminal("ps aux | grep <pattern>")
-→ terminal("tail -30 <logfile>")
-→ terminal("ls results/")
+hermes_terminal(program="sh", arguments=["-c", "ps aux | grep <pattern>"])
+→ hermes_terminal(program="tail", arguments=["-30", "<logfile>"])
+→ hermes_terminal(program="ls", arguments=["results/"])
 → execute_code("analyze results JSON, compute metrics")
-→ terminal("git add -A && git commit -m '<descriptive message>' && git push")
+→ hermes_terminal(program="sh", arguments=["-c", "git add -A && git commit -m '<descriptive message>' && git push"])
 → (final response auto-delivers "Experiment complete: <summary>"; for unattended runs, schedule via cron with a deliver: target)
 ```
 
@@ -2122,9 +2130,9 @@ todo("update", id=1, status="completed")
 ```
 1. todo("list")                           # Check current task list
 2. memory("read")                         # Recall key decisions
-3. terminal("git log --oneline -10")      # Check recent commits
-4. terminal("ps aux | grep python")       # Check running experiments
-5. terminal("ls results/ | tail -20")     # Check for new results
+3. hermes_terminal(program="git", arguments=["log", "--oneline", "-10"])  # Check recent commits
+4. hermes_terminal(program="sh", arguments=["-c", "ps aux | grep python"]) # Check running experiments
+5. hermes_terminal(program="ls", arguments=["results/"])                    # Check for new results
 6. Report status to user, ask for direction
 ```
 
@@ -2161,45 +2169,16 @@ cronjob("create", {
 
 ### Communication Patterns
 
-**When to notify the user** (via your direct/final response, or a cron `deliver:` target for unattended runs):
-- Experiment batch completed (with results table)
-- Unexpected finding or failure requiring decision
-- Draft section ready for review
-- Deadline approaching with incomplete tasks
-
-**When NOT to notify:**
-- Experiment still running, no new results → `[SILENT]`
-- Routine monitoring with no changes → `[SILENT]`
-- Intermediate steps that don't need attention
-
-**Report format** — always include structured data:
-```
-## Experiment: <name>
-Status: Complete / Running / Failed
-
-| Task | Method A | Method B | Method C |
-|------|---------|---------|---------|
-| Task 1 | 85.2 | 82.1 | **89.4** |
-
-Key finding: <one sentence>
-Next step: <what happens next>
-```
+Report completed batches, unexpected findings, draft sections, and deadlines
+with status, key findings, and next steps. Do not notify for unchanged
+monitoring; use `[SILENT]` when the surrounding automation requires it.
 
 ### Decision Points Requiring Human Input
 
-Use `clarify` for targeted questions when genuinely blocked:
-
-| Decision | When to Ask |
-|----------|-------------|
-| Target venue | Before starting paper (affects page limits, framing) |
-| Contribution framing | When multiple valid framings exist |
-| Experiment priority | When TODO list has more experiments than time allows |
-| Submission readiness | Before final submission |
-
-**Do NOT ask about** (be proactive, make a choice, flag it):
-- Word choice, section ordering
-- Which specific results to highlight
-- Citation completeness (draft with what you find, note gaps)
+Use `clarify` only when blocked by target venue, contribution framing,
+experiment priority, or submission readiness. Choose wording, section order,
+highlighted results, and citation gaps proactively; flag uncertainty instead
+of blocking.
 
 ---
 

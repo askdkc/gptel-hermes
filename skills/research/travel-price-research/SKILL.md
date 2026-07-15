@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: travel-price-research
 description: "Find cheapest hotel/travel dates from booking sites and public booking data; compare date ranges, availability, prices, and assumptions."
 version: 1.0.0
@@ -22,7 +23,7 @@ The common pattern is: identify the property/product, find an accessible source 
 
 1. **Clarify only if the default would materially change the answer.** If the user says "cheapest day in July–August" and does not specify guests/rooms, use an obvious default such as 1 night, 1 room, 2 adults, then state it. Ask only if party size, stay length, or room type is central.
 
-2. **Find an accessible authoritative or reputable source.** Prefer official booking APIs/pages, then major OTAs. If one source blocks automated access, try another source before giving up. Do not fabricate prices from snippets.
+2. **Find an accessible authoritative or reputable source.** Prefer official booking APIs/pages, then major OTAs. Use optional web-search or browser integrations for discovery when available; otherwise start from a user-provided source or retrieve official endpoints directly through the terminal. If one source blocks automated access, try another source before giving up. Do not fabricate prices from snippets.
 
 3. **Probe one date first.** Confirm the source returns the target property and the expected fields: date, price, availability/stock, currency, taxes/fees meaning if available.
 

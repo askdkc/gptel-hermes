@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_file_write]
 name: architecture-diagram
 description: "Dark-themed SVG architecture/cloud/infra diagrams as HTML."
 version: 1.0.0
@@ -40,7 +41,9 @@ Based on [Cocoon AI's architecture-diagram-generator](https://github.com/Cocoon-
 
 1. User describes their system architecture (components, connections, technologies)
 2. Generate the HTML file following the design system below
-3. Save with `write_file` to a `.html` file (e.g. `~/architecture-diagram.html`)
+3. Save with `hermes_file_write` using `mode: "create"` to a workspace-relative
+   `.html` file (for example, `architecture-diagram.html`). If the file exists,
+   read it first and replace it with its returned `expected_sha256`.
 4. User opens in any browser — works offline, no dependencies
 
 ### Output Location
@@ -142,7 +145,7 @@ The generated HTML file follows a four-part layout:
 Load the full HTML template for the exact structure, CSS, and SVG component examples:
 
 ```
-skill_view(name="architecture-diagram", file_path="templates/template.html")
+hermes_skill_view(name="architecture-diagram", resource="templates/template.html")
 ```
 
 The template contains working examples of every component type (frontend, backend, database, cloud, security), arrow styles (standard, dashed, curved), security groups, region boundaries, and the legend — use it as your structural reference when generating diagrams.

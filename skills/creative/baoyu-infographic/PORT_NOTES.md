@@ -4,7 +4,8 @@ Ported from [JimLiu/baoyu-skills](https://github.com/JimLiu/baoyu-skills) v1.56.
 
 ## Changes from upstream
 
-Only `SKILL.md` was modified. All 45 reference files are verbatim copies.
+The 45 upstream reference files remain verbatim copies; `SKILL.md` carries the
+Hermes-specific adaptations documented below.
 
 ### SKILL.md adaptations
 
@@ -13,10 +14,10 @@ Only `SKILL.md` was modified. All 45 reference files are verbatim copies.
 | Metadata namespace | `openclaw` | `hermes` |
 | Trigger | `/baoyu-infographic` slash command | Natural language skill matching |
 | User config | EXTEND.md file (project/user/XDG paths) | Removed — not part of Hermes infra |
-| User prompts | `AskUserQuestion` (batched) | `clarify` tool (one at a time) |
-| Image generation | baoyu-imagine (Bun/TypeScript) | `image_generate` tool |
+| User prompts | `AskUserQuestion` (batched) | Ask in the conversation, one question at a time |
+| Image generation | baoyu-imagine (Bun/TypeScript) | `image_gen` tool |
 | Platform support | Linux/macOS/Windows/WSL/PowerShell | Linux/macOS only |
-| File operations | Bash commands | Hermes file tools (write_file, read_file) |
+| File operations | Bash commands | Hermes file tools (hermes_file_write, hermes_file_read) |
 
 ### What was preserved
 

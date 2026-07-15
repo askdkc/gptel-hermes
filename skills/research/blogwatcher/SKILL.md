@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: blogwatcher
 description: "Monitor blogs and RSS/Atom feeds via blogwatcher-cli tool."
 version: 2.0.0
@@ -14,6 +15,12 @@ prerequisites:
 ---
 
 # Blogwatcher
+
+Run `blogwatcher-cli` through `hermes_terminal_authenticated` when using the
+default database path. The database persists under the user's real home. If a
+workspace-local database is preferred, pass its absolute path with the CLI's
+`--db` option; do not assume the standard terminal preserves arbitrary
+environment variables between calls.
 
 Track blog and RSS/Atom feed updates with the `blogwatcher-cli` tool. Supports automatic feed discovery, HTML scraping fallback, OPML import, and read/unread article management.
 

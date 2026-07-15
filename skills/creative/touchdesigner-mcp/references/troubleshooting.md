@@ -133,29 +133,24 @@ n.cook(force=True)
 actual = str(n.width) + 'x' + str(n.height)
 ```
 
-## 5. Hermes Configuration
+## 5. gptel MCP Bridge Configuration
 
-### Config location
-
-`$HERMES_HOME/config.yaml` (defaults to `~/.hermes/config.yaml` when `HERMES_HOME` is unset)
-
-### MCP entry format
-
-The twozero TD entry should look like:
+`gptel-hermes` does not read `$HERMES_HOME/config.yaml`. Register the
+twozero server in the external MCP bridge used by gptel:
 ```yaml
-mcpServers:
-  twozero_td:
-    url: http://localhost:40404/mcp
+twozero_td:
+  url: http://127.0.0.1:40404/mcp
 ```
 
 ### After config changes
 
-Restart the Hermes session for changes to take effect. The MCP connection is
-established at session startup.
+Reload the external bridge and the gptel buffer. The bridge must expose the
+twozero `td_*` tools to gptel; restarting Hermes Agent does not configure
+this package.
 
 ### Verifying MCP tools are available
 
-After restarting, the session log should show twozero MCP tools registered.
+Check the bridge or current gptel tool registry for the twozero tools.
 If tools show as registered but aren't callable, check:
 - The twozero MCP hub is still running (curl test above)
 - TD is still running with a project loaded

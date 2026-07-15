@@ -39,6 +39,16 @@ Adding a mutating or secret-reading function changes the security boundary."
   :type 'number
   :group 'gptel-hermes-runtime)
 
+(defcustom gptel-hermes-enable-authenticated-terminal nil
+  "Whether to expose `hermes_terminal_authenticated'.
+
+When enabled, this explicitly confirmed tool inherits Emacs's environment and
+the real user HOME so locally authenticated CLI tools can use their credentials
+and configuration.  It is disabled by default because those credentials and
+environment variables are then available to the invoked program."
+  :type 'boolean
+  :group 'gptel-hermes-runtime)
+
 (defconst gptel-hermes-runtime--max-file-bytes (* 8 1024 1024))
 (defconst gptel-hermes-runtime--max-file-write-bytes (* 1 1024 1024))
 (defconst gptel-hermes-runtime--max-output-bytes (* 128 1024))
@@ -533,16 +543,25 @@ directly instead."
                    (not (string-match-p "[\0\r\n]" argument)))
         (error "Terminal arguments must be strings without control characters")))))
 
-(defun gptel-hermes-runtime--terminal-environment (home)
-  "Return a sanitized process environment using temporary HOME."
-  (let (environment)
-    (dolist (name gptel-hermes-runtime--safe-environment)
-      (when-let ((value (getenv name)))
-        (push (concat name "=" value) environment)))
-    (dolist (entry gptel-hermes-runtime--fixed-environment)
-      (push (concat (car entry) "=" (cdr entry)) environment))
-    (push (concat "HOME=" home) environment)
-    environment))
+(defun gptel-hermes-runtime--terminal-environment (home &optional authenticated)
+  "Return the terminal environment using HOME.
+
+Without AUTHENTICATED, return the restricted environment used by the standard
+terminal.  With AUTHENTICATED, inherit the current Emacs environment and only
+replace HOME with the explicitly selected value."
+  (if authenticated
+      (cons (concat "HOME=" home)
+            (cl-remove-if (lambda (entry)
+                            (string-prefix-p "HOME=" entry))
+                          (copy-sequence process-environment)))
+    (let (environment)
+      (dolist (name gptel-hermes-runtime--safe-environment)
+        (when-let ((value (getenv name)))
+          (push (concat name "=" value) environment)))
+      (dolist (entry gptel-hermes-runtime--fixed-environment)
+        (push (concat (car entry) "=" (cdr entry)) environment))
+      (push (concat "HOME=" home) environment)
+      environment)))
 
 (defun gptel-hermes-runtime--terminal-state (process)
   "Return terminal state stored on PROCESS."
@@ -639,9 +658,10 @@ directly instead."
             (delete-process stderr-process)))
         (when (buffer-live-p stdout-buffer) (kill-buffer stdout-buffer))
         (when (buffer-live-p stderr-buffer) (kill-buffer stderr-buffer))
-        (when-let ((home (plist-get state :home)))
-          (when (file-directory-p home)
-            (delete-directory home t)))
+        (when (plist-get state :temporary-home)
+          (when-let ((home (plist-get state :home)))
+            (when (file-directory-p home)
+              (delete-directory home t))))
         (funcall (plist-get state :callback) result)))))
 
 (defun gptel-hermes-runtime--terminal-sentinel (process _event)
@@ -649,8 +669,12 @@ directly instead."
   (when (memq (process-status process) '(exit signal closed failed))
     (gptel-hermes-runtime--terminal-result process)))
 
-(defun gptel-hermes-terminal (callback program arguments &optional cwd timeout)
-  "Run PROGRAM asynchronously and call CALLBACK with a bounded result."
+(defun gptel-hermes-terminal (callback program arguments &optional cwd timeout
+                                      authenticated)
+  "Run PROGRAM asynchronously and call CALLBACK with a bounded result.
+
+When AUTHENTICATED is non-nil, use the real HOME and inherited environment.
+This mode is reserved for the explicit `hermes_terminal_authenticated' tool."
   (condition-case error-data
       (let* ((workspace (gptel-hermes-runtime--workspace-or-error))
              (cwd (if cwd
@@ -664,13 +688,17 @@ directly instead."
         (unless (and (numberp timeout) (> timeout 0))
           (error "Timeout must be positive"))
         (setq timeout (min timeout gptel-hermes-runtime--max-terminal-timeout))
-        (let* ((home (make-temp-file "hermes-home-" t))
+        (let* ((temporary-home (not authenticated))
+               (home (if temporary-home
+                         (make-temp-file "hermes-home-" t)
+                       (gptel-hermes-runtime--home-directory)))
                (stdout (generate-new-buffer " *hermes-terminal stdout*"))
                (stderr (generate-new-buffer " *hermes-terminal stderr*"))
                (stderr-process nil)
                (state-cell nil)
                (process-environment
-                (gptel-hermes-runtime--terminal-environment home))
+                (gptel-hermes-runtime--terminal-environment
+                 home authenticated))
                (default-directory cwd))
           (condition-case process-error
               (progn
@@ -690,7 +718,8 @@ directly instead."
                               :sentinel #'gptel-hermes-runtime--terminal-sentinel)))
                 (setq state-cell
                       (list (list :callback callback :program program
-                                  :stdout stdout :stderr stderr :home home)))
+                                  :stdout stdout :stderr stderr :home home
+                                  :temporary-home temporary-home)))
                 (process-put process 'gptel-hermes-terminal-state state-cell)
                 (process-put stderr-process 'gptel-hermes-terminal-state state-cell)
                 (set-process-filter stderr-process
@@ -715,13 +744,25 @@ directly instead."
                (delete-process stderr-process))
              (when (buffer-live-p stdout) (kill-buffer stdout))
              (when (buffer-live-p stderr) (kill-buffer stderr))
-             (when (file-directory-p home) (delete-directory home t))
+             (when (and temporary-home (file-directory-p home))
+               (delete-directory home t))
              (funcall callback
                       (format "Terminal error: %s"
                               (gptel-hermes-runtime--error-string process-error)))))))
     (error
      (funcall callback (format "Terminal error: %s"
                                (gptel-hermes-runtime--error-string error-data))))))
+
+(defun gptel-hermes-terminal-authenticated (callback program arguments
+                                                     &optional cwd timeout)
+  "Run PROGRAM with the real HOME and inherited environment.
+
+Call CALLBACK asynchronously with the bounded result.  This is intended for
+explicitly enabled, confirmed invocations of locally authenticated CLI tools."
+  (if gptel-hermes-enable-authenticated-terminal
+      (gptel-hermes-terminal callback program arguments cwd timeout t)
+    (funcall callback
+             "Terminal error: authenticated terminal is disabled; set gptel-hermes-enable-authenticated-terminal to t")))
 
 (defun gptel-hermes-runtime--elisp-function-name (function)
   "Validate FUNCTION as an allowlisted function name."
@@ -811,19 +852,38 @@ directly instead."
    :category "hermes-runtime" :confirm #'gptel-hermes-runtime--confirm-patch
    :include t))
 
+(defconst gptel-hermes-runtime--terminal-tool-args
+  (list '(:name "program" :type string :description "Executable name or path")
+        '(:name "arguments" :type array :items (:type string)
+          :description "Argument strings; no shell is inserted")
+        '(:name "cwd" :type string :optional t
+          :description "Workspace-relative working directory")
+        '(:name "timeout" :type number :optional t
+          :description "Timeout in seconds, capped at 300")))
+
 (defvar gptel-hermes--runtime-terminal-tool
   (gptel-make-tool
    :name "hermes_terminal"
    :function #'gptel-hermes-terminal
-   :description "Run an executable asynchronously with an argv array in the Hermes workspace. Standard input is closed. This is not an OS sandbox; confirmed programs can access the network and absolute paths."
-   :args (list '(:name "program" :type string :description "Executable name or path")
-               '(:name "arguments" :type array :items (:type string)
-                 :description "Argument strings; no shell is inserted")
-               '(:name "cwd" :type string :optional t
-                 :description "Workspace-relative working directory")
-               '(:name "timeout" :type number :optional t
-                 :description "Timeout in seconds, capped at 300"))
+   :description "Run an executable asynchronously with an argv array in the Hermes workspace. Standard input is closed and foreground calls are killed after at most 300 seconds; launch longer jobs detached with redirected standard streams or use an external process manager. This is not an OS sandbox; confirmed programs can access the network and absolute paths."
+   :args (copy-tree gptel-hermes-runtime--terminal-tool-args)
    :category "hermes-runtime" :confirm t :async t :include t))
+
+(defvar gptel-hermes--runtime-authenticated-terminal-tool nil
+  "Lazily-created authenticated terminal tool, or nil until enabled.")
+
+(defun gptel-hermes-runtime--authenticated-terminal-tool ()
+  "Return the authenticated terminal tool when explicitly enabled."
+  (unless gptel-hermes-enable-authenticated-terminal
+    (error "Authenticated terminal is disabled; set gptel-hermes-enable-authenticated-terminal"))
+  (or gptel-hermes--runtime-authenticated-terminal-tool
+      (setq gptel-hermes--runtime-authenticated-terminal-tool
+            (gptel-make-tool
+             :name "hermes_terminal_authenticated"
+             :function #'gptel-hermes-terminal-authenticated
+             :description "Run an executable asynchronously with the user's real HOME and inherited environment so an authenticated local CLI can use its credentials. Standard input is closed and foreground calls are killed after at most 300 seconds; launch longer jobs detached with redirected standard streams or use an external process manager. Explicit opt-in; confirmed programs may access local credentials, the network, and absolute paths."
+             :args (copy-tree gptel-hermes-runtime--terminal-tool-args)
+             :category "hermes-runtime" :confirm t :async t :include t))))
 
 (defvar gptel-hermes--runtime-elisp-call-tool
   (gptel-make-tool
@@ -856,8 +916,10 @@ directly instead."
   (append (list gptel-hermes--runtime-file-read-tool
                 gptel-hermes--runtime-file-write-tool
                 gptel-hermes--runtime-apply-patch-tool
-                gptel-hermes--runtime-terminal-tool
-                gptel-hermes--runtime-elisp-call-tool)
+                gptel-hermes--runtime-terminal-tool)
+          (when gptel-hermes-enable-authenticated-terminal
+            (list (gptel-hermes-runtime--authenticated-terminal-tool)))
+          (list gptel-hermes--runtime-elisp-call-tool)
           (when gptel-hermes-enable-unsafe-elisp-eval
             (list (gptel-hermes-runtime--unsafe-elisp-eval-tool)))))
 

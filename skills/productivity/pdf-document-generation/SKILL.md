@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write, hermes_terminal, browser_vision]
 name: pdf-document-generation
 description: "Generate polished PDFs from HTML or structured content with reliable Japanese typography, embedded fonts, and visual verification."
 version: 1.0.0

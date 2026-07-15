@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: linux-tailscale-networking
 description: "Configure and troubleshoot Tailscale on Linux with iptables/nftables, subnet routing, exit nodes, Tailscale Serve, and locally bound services."
 version: 1.0.0

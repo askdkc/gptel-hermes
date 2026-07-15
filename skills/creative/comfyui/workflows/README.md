@@ -1,8 +1,12 @@
 # Example Workflows
 
 These are starter API-format workflows for the most common tasks. They're
-ready to run with `scripts/run_workflow.py` once you've installed (or have
+ready to run with `$SKILL_DIR/scripts/run_workflow.py` once you've installed (or have
 cloud access to) the listed models.
+
+These are bundled resources. Resolve each script and workflow with
+`hermes_skill_resource_path` and set `SKILL_DIR` to its returned `Skill
+directory` before running the examples; do not use workspace-relative paths.
 
 | File | Purpose | Required models | Min VRAM |
 |------|---------|-----------------|----------|
@@ -19,31 +23,30 @@ cloud access to) the listed models.
 
 ```bash
 # Run a workflow with prompt injection
-python3 ../scripts/run_workflow.py \
-  --workflow sdxl_txt2img.json \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
+  --workflow "$SKILL_DIR"/workflows/sdxl_txt2img.json \
   --args '{"prompt": "majestic eagle in flight", "seed": 12345, "steps": 35}' \
   --output-dir ./out
 
 # Img2img: upload an input image first via the script's helper
-python3 ../scripts/run_workflow.py \
-  --workflow sdxl_img2img.json \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
+  --workflow "$SKILL_DIR"/workflows/sdxl_img2img.json \
   --input-image image=./photo.png \
   --args '{"prompt": "make it watercolor", "denoise": 0.6}' \
   --output-dir ./out
 
-# Cloud (set API key once)
-export COMFY_CLOUD_API_KEY="comfyui-..."
-python3 ../scripts/run_workflow.py \
-  --workflow flux_dev_txt2img.json \
+# Cloud (COMFY_CLOUD_API_KEY is inherited from Emacs; set it as described in SKILL.md)
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
+  --workflow "$SKILL_DIR"/workflows/flux_dev_txt2img.json \
   --args '{"prompt": "a fox in a misty forest"}' \
   --host https://cloud.comfy.org \
   --output-dir ./out
 
 # What can I tweak in this workflow?
-python3 ../scripts/extract_schema.py sdxl_txt2img.json --summary-only
+python3 "$SKILL_DIR"/scripts/extract_schema.py "$SKILL_DIR"/workflows/sdxl_txt2img.json --summary-only
 
 # Are all required models / nodes installed?
-python3 ../scripts/check_deps.py wan_video_t2v.json
+python3 "$SKILL_DIR"/scripts/check_deps.py "$SKILL_DIR"/workflows/wan_video_t2v.json
 ```
 
 ## Notes
@@ -58,8 +61,11 @@ python3 ../scripts/check_deps.py wan_video_t2v.json
 - **Flux Dev** needs ~24 GB VRAM in its base form. The `flux1-dev-fp8.safetensors`
   variant (already on Comfy Cloud) cuts that roughly in half.
 
-- **Video workflows** can take many minutes. The skill auto-detects video
-  output nodes and bumps the default timeout to 900s. Override with `--timeout 1800`.
+- **Video workflows** can take many minutes. The script auto-detects video
+  output nodes and bumps its own timeout to 900s, but Hermes still kills a
+  foreground terminal call after 300s. Launch video jobs with the detached or
+  external process procedure in `SKILL.md`; `--timeout 1800` only changes the
+  detached script's internal timeout.
 
 - These JSON files are deliberately **API format** (top-level keys are node IDs
   with `class_type`), not editor format. To open them in ComfyUI's web UI for
@@ -74,8 +80,8 @@ keeps the original name (`v1-5-pruned-emaonly.safetensors`). The example
 workflows use the local-canonical names. When running on cloud, override with:
 
 ```bash
-python3 ../scripts/run_workflow.py \
-  --workflow sd15_txt2img.json \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
+  --workflow "$SKILL_DIR"/workflows/sd15_txt2img.json \
   --args '{"ckpt_name": "v1-5-pruned-emaonly-fp16.safetensors", "prompt": "..."}' \
   --host https://cloud.comfy.org
 ```

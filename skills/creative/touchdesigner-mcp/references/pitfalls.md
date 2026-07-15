@@ -112,15 +112,14 @@ fragColor = TDOutputSwizzle(color);
 ```
 TD uses GLSL 4.60 (Vulkan backend). GLSL 3.30 and earlier removed.
 
-### 10. Large GLSL shaders — write to temp file
+### 10. Large GLSL shaders — write directly to a Text DAT
 
-GLSL code with special characters can corrupt JSON payloads. Write the shader to a temp file and load it in TD:
+Do not pass an agent-side `/tmp` path to `hermes_file_write`; workspace path
+validation rejects it. Create the Text DAT, then let the MCP bridge encode the
+shader text safely:
 ```python
-# Agent side: write shader to /tmp/shader.glsl via write_file
-# TD side:
-sd = root.create(textDAT, 'shader_code')
-with open('/tmp/shader.glsl', 'r') as f:
-    sd.text = f.read()
+# First create /project1/shader_code as a Text DAT, then call:
+td_write_dat(path="/project1/shader_code", text="<complete GLSL source>")
 ```
 
 ## Node Management

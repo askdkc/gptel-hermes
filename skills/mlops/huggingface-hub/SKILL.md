@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: huggingface-hub
 description: "HuggingFace hf CLI: search/download/upload models, datasets."
 version: 1.0.0
@@ -11,6 +12,10 @@ platforms: [linux, macos, windows]
 # Hugging Face CLI (`hf`) Reference Guide
 
 The `hf` command is the modern command-line interface for interacting with the Hugging Face Hub, providing tools to manage repositories, models, datasets, and Spaces.
+
+Run non-interactive commands below through `hermes_terminal_authenticated`.
+The user must complete `hf auth login` outside the tool, because terminal stdin
+is closed; an already-exported `HF_TOKEN` is also supported.
 
 > **IMPORTANT:** The `hf` command replaces the now deprecated `huggingface-cli` command.
 

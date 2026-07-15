@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: airtable
 description: Airtable REST API via curl. Records CRUD, filters, upserts.
 version: 1.1.0
@@ -16,7 +17,9 @@ metadata:
 
 # Airtable — Bases, Tables & Records
 
-Work with Airtable's REST API directly via `curl` using the `terminal` tool. No MCP server, no OAuth flow, no Python SDK — just `curl` and a personal access token.
+Work with Airtable's REST API directly via `curl` using
+`hermes_terminal_authenticated`. No MCP server, no OAuth flow, no Python SDK —
+just `curl` and a personal access token.
 
 ## Prerequisites
 
@@ -26,10 +29,9 @@ Work with Airtable's REST API directly via `curl` using the `terminal` tool. No 
    - `data.records:write` — create / update / delete rows
    - `schema.bases:read` — list bases and tables
 3. **Important:** in the same token UI, add each base you want to access to the token's **Access** list. PATs are scoped per-base — a valid token on the wrong base returns `403`.
-4. Store the token in `${HERMES_HOME:-~/.hermes}/.env` (or via `hermes setup`):
-   ```
-   AIRTABLE_API_KEY=pat_your_token_here
-   ```
+4. Export `AIRTABLE_API_KEY` before starting Emacs, or set it in Emacs with
+   `(setenv "AIRTABLE_API_KEY" "pat_your_token_here")`. Never commit a real
+   token.
 
 > Note: legacy `key...` API keys were deprecated Feb 2024. Only PATs and OAuth tokens work now.
 
@@ -221,8 +223,12 @@ done
 
 ## Important Notes for Hermes
 
-- **Always use the `terminal` tool with `curl`.** Do NOT use `web_extract` (it can't send auth headers) or `browser_navigate` (needs UI auth and is slow).
-- **`AIRTABLE_API_KEY` flows from `${HERMES_HOME:-~/.hermes}/.env` into the subprocess automatically** when this skill is loaded — no need to re-export it before each `curl` call.
+- **Always use `hermes_terminal_authenticated` with `curl`.** Do NOT use web content
+  extraction (it cannot send auth headers) or browser navigation (it needs UI
+  auth and is slow).
+- **`AIRTABLE_API_KEY` must already be present in Emacs's environment.**
+  `hermes_terminal_authenticated` preserves it but does not source `.env`; the
+  user must export or otherwise configure it before using this skill.
 - **Escape curly braces in formulas carefully.** In a heredoc body, `{Status}` is literal. In a shell argument, `{Status}` is safe outside `{...}` brace-expansion context — but pass dynamic strings through `python3 urllib.parse.quote` before splicing into a URL.
 - **Pretty-print with `python3 -m json.tool`** (always present) rather than `jq` (optional). Only reach for `jq` when you need filtering/projection.
 - **Pagination is per-page, not global.** Airtable's 100-record cap is a hard limit; there is no way to bump it. Loop with `offset` until the field is absent.

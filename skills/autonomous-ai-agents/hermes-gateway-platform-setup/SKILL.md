@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: hermes-gateway-platform-setup
 description: "Set up and troubleshoot Hermes messaging gateway platform plugins (Telegram, Slack, WhatsApp, Photon/iMessage, etc.) with verification-first CLI workflows."
 version: 1.0.0
@@ -15,6 +16,12 @@ metadata:
 Use this skill when the user asks to add, configure, enable, troubleshoot, or verify a Hermes messaging platform such as Telegram, Slack, WhatsApp, Photon/iMessage, Signal, Matrix, Teams, LINE, Email, SMS, or another gateway adapter.
 
 This skill supplements the protected bundled `hermes-agent` skill. Treat official docs and the live CLI as source of truth, but use the workflow below to avoid common plugin-registration and setup pitfalls.
+
+Run the Hermes commands below through `hermes_terminal_authenticated`. Gateway
+configuration and plugin state live under the user's real `~/.hermes` home;
+the standard terminal's temporary home cannot provide a durable setup. Complete
+interactive login or device approval outside the tool because terminal stdin is
+closed.
 
 ## Operating rules
 

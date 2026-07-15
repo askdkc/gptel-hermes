@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: laravel-boost
 description: Use when working on Laravel application code with AI assistance, especially when Laravel Boost MCP/context should be considered before generating Laravel-specific code, tests, migrations, routes, queues, or frontend integration.
 version: 1.0.0

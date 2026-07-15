@@ -11,25 +11,22 @@ Use this reference when the user says:
 
 ## Workflow
 
-Run exactly this command:
+Run exactly this command through `hermes_terminal_authenticated`:
 
 ```bash
-pwd && git pull && ~/tools/syncmaeda.sh
+cd /home/ubuntu/Sites/maedaweb && pwd && git pull && /home/ubuntu/tools/syncmaeda.sh
 ```
 
-with working directory:
-
-```text
-/home/ubuntu/Sites/maedaweb
-```
-
-Equivalent Hermes terminal call:
+Equivalent authenticated Hermes terminal call:
 
 ```json
 {
-  "command": "pwd && git pull && ~/tools/syncmaeda.sh",
-  "timeout": 600,
-  "workdir": "/home/ubuntu/Sites/maedaweb"
+  "program": "sh",
+  "arguments": [
+    "-c",
+    "cd /home/ubuntu/Sites/maedaweb && pwd && git pull && /home/ubuntu/tools/syncmaeda.sh"
+  ],
+  "timeout": 300
 }
 ```
 
@@ -51,11 +48,12 @@ total size is ...  speedup is ...
 Report succinctly in Japanese:
 
 - `git pull` result, e.g. `Already up to date` or changed files
-- `~/tools/syncmaeda.sh` success/failure based on exit code
+- `/home/ubuntu/tools/syncmaeda.sh` success/failure based on exit code
 - rsync summary lines such as `sent ...`, `total size ...`
 
 ## Pitfalls
 
-- Do not run from `/home/ubuntu` or any other directory; set `workdir` explicitly.
+- Do not run from `/home/ubuntu` or any other directory; the command must `cd`
+  to `/home/ubuntu/Sites/maedaweb` before running.
 - Do not split commands unless debugging; the chained command prevents syncing after a failed pull.
 - Do not claim success from memory. Always run the command and use real output.

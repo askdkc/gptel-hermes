@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_resource_path, hermes_terminal_authenticated, cronjob]
 name: web-endpoint-monitoring
 description: "Use when setting up recurring watchdogs for URLs, API endpoints, rendered images, embedded data images, or simple availability checks that should notify only on abnormal conditions."
 version: 1.0.0
@@ -11,6 +12,11 @@ metadata:
 ---
 
 # Web Endpoint Monitoring
+
+Run probes, script creation, and cron setup through
+`hermes_terminal_authenticated`: this workflow persists scripts under the
+user's real `~/.hermes/scripts/` directory. Use a workspace path instead if a
+standard temporary-home terminal is required.
 
 ## Overview
 
@@ -54,10 +60,22 @@ Don't use this for:
 
 6. **Report the contract.** Tell the user the interval, URL, notification conditions, normal silence behavior, and job ID. Do not paste long script bodies unless asked.
 
+## Bundled starters
+
+The starter files are package resources, not workspace-relative files. Before
+copying one into the persistent `~/.hermes/scripts/` directory, resolve it with
+`hermes_skill_resource_path(name="web-endpoint-monitoring", resource="scripts/http_image_watch.py")`
+or the corresponding `templates/html-site-watch.py` resource and use the
+returned absolute `Effective path` in the copy command.
+
 ## Implementation Notes
 
-- Put reusable scripts in `scripts/`. See `scripts/http_image_watch.py` for a parameterized image/embedded-data-image watchdog starter.
-- For ordinary HTML pages, copy `templates/html-site-watch.py` into `~/.hermes/scripts/` and customize `URL`, `LABEL`, `EXPECTED_MARKER`, and optionally `EXPECTED_PATH`.
+- Put reusable scripts in the persistent `~/.hermes/scripts/` directory. Use
+  the resolved `scripts/http_image_watch.py` resource as a parameterized
+  image/embedded-data-image watchdog starter.
+- For ordinary HTML pages, copy the resolved `templates/html-site-watch.py`
+  resource into `~/.hermes/scripts/` and customize `URL`, `LABEL`,
+  `EXPECTED_MARKER`, and optionally `EXPECTED_PATH`.
 - Choose a stable marker from the live healthy page—usually the exact `<title>` or a product/site heading. For SPA shells where record data loads client-side, validate the stable application title plus the final URL path rather than requiring dynamic record text in the initial HTML.
 - When redirects are expected (for example HTTP→HTTPS), allow them but validate `response.geturl()` host/path so a redirect to a generic error, login, or home page does not count as healthy.
 - Put session-specific endpoint notes in `references/` when the health shape is unusual. See `references/qr-data-image-watchdog.md` for the QR-as-HTML-`data:image` pattern.

@@ -1,61 +1,56 @@
 ---
+requires_tools: [obsidian]
 name: obsidian
-description: Read, search, create, and edit notes in the Obsidian vault.
+description: Read, search, create, and edit notes in an Obsidian vault.
 platforms: [linux, macos, windows]
 ---
 
 # Obsidian Vault
 
-Use this skill for filesystem-first Obsidian vault work: reading notes, listing notes, searching note files, creating notes, appending content, and adding wikilinks.
+Use the external `obsidian` capability for vault operations. It must resolve a
+configured vault and accept note paths relative to that vault. This Skill does
+not assume that a vault is inside the current workspace.
 
-## Vault path
+## Vault resolution
 
-Use a known or resolved vault path before calling file tools.
+Resolve the active vault through the `obsidian` integration before operating on
+notes. A configuration such as `OBSIDIAN_VAULT_PATH` may identify the vault for
+that integration, but do not pass the variable text itself as a path. Do not
+turn it into a workspace-relative path by guessing, and do not use the standard
+workspace file tools for an outside vault.
 
-The documented vault-path convention is the `OBSIDIAN_VAULT_PATH` environment variable, for example from `${HERMES_HOME:-~/.hermes}/.env`. If it is unset, use `~/Documents/Obsidian Vault`.
+If no vault is configured or the external capability is unavailable, stop and
+report that the vault cannot be accessed. The fallback `~/Documents/Obsidian
+Vault` is only a human configuration suggestion, not an access guarantee.
 
-File tools do not expand shell variables. Do not pass paths containing `$OBSIDIAN_VAULT_PATH` to `read_file`, `write_file`, `patch`, or `search_files`; resolve the vault path first and pass a concrete absolute path. Vault paths may contain spaces, which is another reason to prefer file tools over shell commands.
+## Read and search
 
-If the vault path is unknown, `terminal` is acceptable for resolving `OBSIDIAN_VAULT_PATH` or checking whether the fallback path exists. Once the path is known, switch back to file tools.
+- Read notes through `obsidian`, using paths relative to the resolved vault.
+- List markdown notes through the integration's file-list operation.
+- Search note contents through its content-search operation, restricted to
+  `*.md` when appropriate.
+- Prefer the integration's structured results so note names and locations are
+  not confused with shell output.
 
-## Read a note
+## Create and edit
 
-Use `read_file` with the resolved absolute path to the note. Prefer this over `cat` because it provides line numbers and pagination.
-
-## List notes
-
-Use `search_files` with `target: "files"` and the resolved vault path. Prefer this over `find` or `ls`.
-
-- To list all markdown notes, use `pattern: "*.md"` under the vault path.
-- To list a subfolder, search under that subfolder's absolute path.
-
-## Search
-
-Use `search_files` for both filename and content searches. Prefer this over `grep`, `find`, or `ls`.
-
-- For filenames, use `search_files` with `target: "files"` and a filename `pattern`.
-- For note contents, use `search_files` with `target: "content"`, the content regex as `pattern`, and `file_glob: "*.md"` when you want to restrict matches to markdown notes.
-
-## Create a note
-
-Use `write_file` with the resolved absolute path and the full markdown content. Prefer this over shell heredocs or `echo` because it avoids shell quoting issues and returns structured results.
-
-## Append to a note
-
-Prefer a native file-tool workflow when it is not awkward:
-
-- Read the target note with `read_file`.
-- Use `patch` for an anchored append when there is stable context, such as adding a section after an existing heading or appending before a known trailing block.
-- Use `write_file` when rewriting the whole note is clearer than constructing a fragile patch.
-
-For an anchored append with `patch`, replace the anchor with the anchor plus the new content.
-
-For a simple append with no stable context, `terminal` is acceptable if it is the clearest safe option.
-
-## Targeted edits
-
-Use `patch` for focused note changes when the current content gives you stable context. Prefer this over shell text rewriting.
+- Create a note through the integration's write operation with the full
+  markdown content.
+- For a focused edit, use its anchored patch operation after reading the note.
+- For a simple append, use its append operation or rewrite the complete note
+  when that is safer.
+- Preserve YAML frontmatter, existing wikilinks, and unrelated content.
 
 ## Wikilinks
 
-Obsidian links notes with `[[Note Name]]` syntax. When creating notes, use these to link related content.
+Obsidian links notes with `[[Note Name]]` syntax. When creating notes, use
+wikilinks for related notes and verify that linked note names exist when the
+integration can list them.
+
+## Safety
+
+- Never claim that a note changed until the integration reports success.
+- Keep vault paths and note paths separate; a vault path identifies the
+  external store, while a note path is relative to it.
+- Do not silently fall back to a different vault.
+- Do not perform bulk rewrites without an explicit user request.

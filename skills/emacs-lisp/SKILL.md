@@ -1,4 +1,5 @@
 ---
+requires_tools: []
 name: emacs-lisp
 description: "Practical Emacs Lisp coding patterns, gotchas, and API quickref distilled from the GNU Emacs Lisp Reference Manual (Emacs 30.2)."
 version: 1.0.0

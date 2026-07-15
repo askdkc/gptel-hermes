@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: svelte-ai-tools
 description: Use when working on Svelte frontend tasks, especially creating or editing .svelte files, SvelteKit code, or Svelte 5 runes code where the official Svelte AI tools/MCP/docs should be used for current framework-specific guidance.
 version: 1.0.0
@@ -59,7 +60,7 @@ For Codex CLI, the Svelte repository is also a plugin marketplace:
 codex plugin marketplace add sveltejs/ai-tools
 ```
 
-Manual Codex MCP config, typically `~/.codex/config.toml`:
+Manual Codex MCP config in the user's Codex configuration file:
 
 ```toml
 [mcp_servers.svelte]

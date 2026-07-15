@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal, hermes_file_read]
 name: systematic-debugging
 description: "4-phase root cause debugging: understand bugs before fixing."
 version: 1.1.0
@@ -74,7 +75,8 @@ You MUST complete each phase before proceeding to the next.
 - Read stack traces completely
 - Note line numbers, file paths, error codes
 
-**Action:** Use `read_file` on the relevant source files. Use `search_files` to find the error string in the codebase.
+**Action:** Use `hermes_file_read` on the relevant source files. Use
+`hermes_terminal` with `rg` to find the error string in the codebase.
 
 ### 2. Build a Tight Feedback Loop
 
@@ -105,7 +107,7 @@ You MUST complete each phase before proceeding to the next.
 
 For non-deterministic bugs, the immediate goal is a higher reproduction rate, not perfection. Run the trigger 100x, parallelize, add stress, narrow timing windows, or inject sleeps. A 50% flake is debuggable; a 1% flake usually is not.
 
-**Action:** Use the `terminal` tool to run the tight loop:
+**Action:** Use `hermes_terminal` to run the tight loop:
 
 ```bash
 # Run a specific failing test
@@ -162,14 +164,14 @@ THEN investigate that specific component.
 - Keep tracing upstream until you find the source
 - Fix at the source, not at the symptom
 
-**Action:** Use `search_files` to trace references:
+**Action:** Use `hermes_terminal` with `rg` to trace references:
 
 ```python
 # Find where the function is called
-search_files("function_name(", path="src/", file_glob="*.py")
+hermes_terminal(program="rg", arguments=["function_name\\(", "--glob", "*.py", "src/"])
 
 # Find where the variable is set
-search_files("variable_name\\s*=", path="src/", file_glob="*.py")
+hermes_terminal(program="rg", arguments=["variable_name\\s*=", "--glob", "*.py", "src/"])
 ```
 
 ### Phase 1 Completion Checklist
@@ -202,10 +204,10 @@ Done when removing any remaining element makes the loop go green. A minimal repr
 - Locate similar working code in the same codebase
 - What works that's similar to what's broken?
 
-**Action:** Use `search_files` to find comparable patterns:
+**Action:** Use `hermes_terminal` with `rg` to find comparable patterns:
 
 ```python
-search_files("similar_pattern", path="src/", file_glob="*.py")
+hermes_terminal(program="rg", arguments=["similar_pattern", "--glob", "*.py", "src/"])
 ```
 
 ### 2. Compare Against References
@@ -365,32 +367,16 @@ If you catch yourself thinking:
 
 Use these Hermes tools during Phase 1:
 
-- **`search_files`** — Find error strings, trace function calls, locate patterns
-- **`read_file`** — Read source code with line numbers for precise analysis
-- **`terminal`** — Run tests, check git history, reproduce bugs
-- **`web_search`/`web_extract`** — Research error messages, library docs
+- **`hermes_terminal`** — Run tests, search with `rg`, check git history, and reproduce bugs
+- **`hermes_file_read`** — Read source code with line numbers for precise analysis
+- **Optional `web_search`/`web_extract`** — Research error messages and library
+  docs when those integrations are configured
 
-### With delegate_task
+### If another agent is unavailable
 
-For complex multi-component debugging, dispatch investigation subagents:
-
-```python
-delegate_task(
-    goal="Investigate why [specific test/behavior] fails",
-    context="""
-    Follow systematic-debugging skill:
-    1. Read the error message carefully
-    2. Reproduce the issue
-    3. Trace the data flow to find root cause
-    4. Report findings — do NOT fix yet
-
-    Error: [paste full error]
-    File: [path to failing code]
-    Test command: [exact command]
-    """,
-    toolsets=['terminal', 'file']
-)
-```
+Run the investigation phases sequentially in the current agent. Preserve the
+same evidence handoff: record the reproduction, root-cause evidence, and the
+next test before changing production code.
 
 ### With test-driven-development
 

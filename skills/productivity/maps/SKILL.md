@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal, hermes_skill_resource_path]
 name: maps
 description: "Geocode, POIs, routes, timezones via OpenStreetMap/OSRM."
 version: 1.2.0
@@ -39,19 +40,29 @@ functionality is covered by the `nearby` command below, with the same
 
 Python 3.8+ (stdlib only — no pip installs needed).
 
-Script path: `~/.hermes/skills/maps/scripts/maps_client.py`
+Before running a command, call
+`hermes_skill_resource_path(name="maps", resource="scripts/maps_client.py")`.
+Use its returned absolute `Effective path`; do not assume a home-directory
+copy or a workspace-relative `scripts/` path. Pass that path as the first
+element of `arguments` in every `hermes_terminal` call; each call is a fresh
+process, so do not define a shell variable for it.
+
+For example:
+
+```python
+hermes_terminal(
+    program="python3",
+    arguments=["/absolute/path/returned-by-hermes_skill_resource_path",
+               "search", "Eiffel Tower"])
+```
 
 ## Commands
-
-```bash
-MAPS=~/.hermes/skills/maps/scripts/maps_client.py
-```
 
 ### search — Geocode a place name
 
 ```bash
-python3 $MAPS search "Eiffel Tower"
-python3 $MAPS search "1600 Pennsylvania Ave, Washington DC"
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" search "Eiffel Tower"
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" search "1600 Pennsylvania Ave, Washington DC"
 ```
 
 Returns: lat, lon, display name, type, bounding box, importance score.
@@ -59,7 +70,7 @@ Returns: lat, lon, display name, type, bounding box, importance score.
 ### reverse — Coordinates to address
 
 ```bash
-python3 $MAPS reverse 48.8584 2.2945
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" reverse 48.8584 2.2945
 ```
 
 Returns: full address breakdown (street, city, state, country, postcode).
@@ -68,15 +79,15 @@ Returns: full address breakdown (street, city, state, country, postcode).
 
 ```bash
 # By coordinates (from a Telegram location pin, for example)
-python3 $MAPS nearby 48.8584 2.2945 restaurant --limit 10
-python3 $MAPS nearby 40.7128 -74.0060 hospital --radius 2000
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" nearby 48.8584 2.2945 restaurant --limit 10
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" nearby 40.7128 -74.0060 hospital --radius 2000
 
 # By address / city / zip / landmark — --near auto-geocodes
-python3 $MAPS nearby --near "Times Square, New York" --category cafe
-python3 $MAPS nearby --near "90210" --category pharmacy
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" nearby --near "Times Square, New York" --category cafe
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" nearby --near "90210" --category pharmacy
 
 # Multiple categories merged into one query
-python3 $MAPS nearby --near "downtown austin" --category restaurant --category bar --limit 10
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" nearby --near "downtown austin" --category restaurant --category bar --limit 10
 ```
 
 46 categories: restaurant, cafe, bar, hospital, pharmacy, hotel, guest_house,
@@ -95,9 +106,9 @@ directions from the search point), and promoted tags when available —
 ### distance — Travel distance and time
 
 ```bash
-python3 $MAPS distance "Paris" --to "Lyon"
-python3 $MAPS distance "New York" --to "Boston" --mode driving
-python3 $MAPS distance "Big Ben" --to "Tower Bridge" --mode walking
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" distance "Paris" --to "Lyon"
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" distance "New York" --to "Boston" --mode driving
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" distance "Big Ben" --to "Tower Bridge" --mode walking
 ```
 
 Modes: driving (default), walking, cycling. Returns road distance, duration,
@@ -106,8 +117,8 @@ and straight-line distance for comparison.
 ### directions — Turn-by-turn navigation
 
 ```bash
-python3 $MAPS directions "Eiffel Tower" --to "Louvre Museum" --mode walking
-python3 $MAPS directions "JFK Airport" --to "Times Square" --mode driving
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" directions "Eiffel Tower" --to "Louvre Museum" --mode walking
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" directions "JFK Airport" --to "Times Square" --mode driving
 ```
 
 Returns numbered steps with instruction, distance, duration, road name, and
@@ -116,8 +127,8 @@ maneuver type (turn, depart, arrive, etc.).
 ### timezone — Timezone for coordinates
 
 ```bash
-python3 $MAPS timezone 48.8584 2.2945
-python3 $MAPS timezone 35.6762 139.6503
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" timezone 48.8584 2.2945
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" timezone 35.6762 139.6503
 ```
 
 Returns timezone name, UTC offset, and current local time.
@@ -125,8 +136,8 @@ Returns timezone name, UTC offset, and current local time.
 ### area — Bounding box and area for a place
 
 ```bash
-python3 $MAPS area "Manhattan, New York"
-python3 $MAPS area "London"
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" area "Manhattan, New York"
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" area "London"
 ```
 
 Returns bounding box coordinates, width/height in km, and approximate area.
@@ -135,7 +146,7 @@ Useful as input for the bbox command.
 ### bbox — Search within a bounding box
 
 ```bash
-python3 $MAPS bbox 40.75 -74.00 40.77 -73.98 restaurant --limit 20
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" bbox 40.75 -74.00 40.77 -73.98 restaurant --limit 20
 ```
 
 Finds POIs within a geographic rectangle. Use `area` first to get the
@@ -148,14 +159,16 @@ When a user sends a location pin, the message contains `latitude:` and
 
 ```bash
 # User sent a pin at 36.17, -115.14 and asked "find cafes nearby"
-python3 $MAPS nearby 36.17 -115.14 cafe --radius 1500
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" nearby 36.17 -115.14 cafe --radius 1500
 ```
 
 Present results as a numbered list with names, distances, and the
 `maps_url` field so the user gets a tap-to-open link in chat. For "open
 now?" questions, check the `hours` field; if missing or unclear, verify
-with `web_search` since OSM hours are community-maintained and not always
-current.
+with `web_search` if that tool is available, since OSM hours are
+community-maintained and not always current. If `web_search` is unavailable,
+report that current opening status could not be verified; do not infer
+open/closed from missing or unclear OSM hours.
 
 ## Workflow Examples
 
@@ -187,9 +200,9 @@ current.
 ## Verification
 
 ```bash
-python3 ~/.hermes/skills/maps/scripts/maps_client.py search "Statue of Liberty"
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" search "Statue of Liberty"
 # Should return lat ~40.689, lon ~-74.044
 
-python3 ~/.hermes/skills/maps/scripts/maps_client.py nearby --near "Times Square" --category restaurant --limit 3
+python3 "/absolute/path/returned-by-hermes_skill_resource_path" nearby --near "Times Square" --category restaurant --limit 3
 # Should return a list of restaurants within ~500m of Times Square
 ```

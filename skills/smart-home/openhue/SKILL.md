@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: openhue
 description: "Control Philips Hue lights, scenes, rooms via OpenHue CLI."
 version: 1.0.0
@@ -26,6 +27,11 @@ curl -sL https://github.com/openhue/openhue-cli/releases/latest/download/openhue
 # macOS
 brew install openhue/cli/openhue-cli
 ```
+
+Run OpenHue through `hermes_terminal_authenticated`: pairing state is stored
+under the real HOME, while standard `hermes_terminal` uses a temporary HOME.
+The first pairing still requires the user to press the Hue Bridge button;
+stdin is closed for terminal tool calls.
 
 First run requires pressing the button on your Hue Bridge to pair. The bridge must be on the same local network.
 

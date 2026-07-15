@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated, hermes_file_read, hermes_file_write, hermes_apply_patch]
 name: github-pr-workflow
 description: "GitHub PR lifecycle: branch, commit, open, CI, merge."
 version: 1.1.0
@@ -14,6 +15,10 @@ metadata:
 # GitHub Pull Request Workflow
 
 Complete guide for managing the PR lifecycle. Each section shows the `gh` way first, then the `git` + `curl` fallback for machines without `gh`.
+
+Run commands below through `hermes_terminal_authenticated`. The user must
+complete any interactive GitHub login outside the tool; terminal stdin is
+closed.
 
 ## Prerequisites
 
@@ -77,7 +82,9 @@ Branch naming conventions:
 
 ## 2. Making Commits
 
-Use the agent's file tools (`write_file`, `patch`) to make changes, then commit:
+Use `hermes_file_write` with `mode: "create"` or a prior SHA for replacement,
+and `hermes_apply_patch` for unified Git patches. Commit through
+`hermes_terminal_authenticated` with argv:
 
 ```bash
 # Stage specific files
@@ -251,7 +258,8 @@ cd /tmp && unzip -o ci-logs.zip -d ci-logs && cat ci-logs/*.txt
 
 ### Step 2: Fix and Push
 
-After identifying the issue, use file tools (`patch`, `write_file`) to fix it:
+After identifying the issue, use `hermes_apply_patch` or a SHA-checked
+`hermes_file_write` to fix it:
 
 ```bash
 git add <fixed_files>
@@ -269,7 +277,7 @@ When asked to auto-fix CI, follow this loop:
 
 1. Check CI status → identify failures
 2. Read failure logs → understand the error
-3. Use `read_file` + `patch`/`write_file` → fix the code
+3. Use `hermes_file_read` + `hermes_apply_patch`/`hermes_file_write` → fix the code
 4. `git add . && git commit -m "fix: ..." && git push`
 5. Wait for CI → re-check status
 6. Repeat if still failing (up to 3 attempts, then ask the user)

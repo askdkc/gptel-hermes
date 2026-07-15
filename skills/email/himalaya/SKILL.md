@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: himalaya
 description: "Himalaya CLI: IMAP/SMTP email from terminal."
 version: 1.1.0
@@ -101,10 +102,15 @@ folder.aliases.trash = "Trash"
 
 ## Hermes Integration Notes
 
-- **Reading, listing, searching, moving, deleting** all work directly through the terminal tool
-- **Composing/replying/forwarding** — piped input (`cat << EOF | himalaya template send`) is recommended for reliability. Interactive `$EDITOR` mode works with `pty=true` + background + process tool, but requires knowing the editor and its commands
+- **Reading, listing, searching, moving, deleting** use `hermes_terminal_authenticated` with
+  the CLI executable and argv array.
+- **Composing/replying/forwarding** — use an explicit `sh -c` argv when a pipe
+  is required, for example `hermes_terminal_authenticated(program="sh", arguments=["-c", ...])`.
+  Interactive `$EDITOR` mode is unavailable because gptel-hermes has no PTY or
+  process-session tool.
 - Use `--output json` for structured output that's easier to parse programmatically
-- The `himalaya account configure` wizard requires interactive input — use PTY mode: `terminal(command="himalaya account configure", pty=true)`
+- The `himalaya account configure` wizard requires interactive input. Stop and
+  ask the user to run it manually; do not claim that gptel-hermes completed it.
 
 ## Common Operations
 
@@ -209,7 +215,9 @@ Or with headers flag:
 himalaya message write -H "To:recipient@example.com" -H "Subject:Test" "Message body here"
 ```
 
-Note: `himalaya message write` without piped input opens `$EDITOR`. This works with `pty=true` + background mode, but piping is simpler and more reliable.
+Note: `himalaya message write` without piped input opens `$EDITOR`. Use a
+noninteractive piped invocation through `hermes_terminal_authenticated`, or ask the user to
+run the editor manually.
 
 ### Move/Copy Emails
 

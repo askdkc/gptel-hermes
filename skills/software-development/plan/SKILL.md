@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_read, hermes_file_write, hermes_terminal]
 name: plan
 description: "Plan mode: write an actionable markdown plan to .hermes/plans/, no execution. Bite-sized tasks, exact paths, complete code."
 version: 2.0.0
@@ -42,7 +43,7 @@ If the task is code-related, include exact file paths, likely test targets, and 
 
 ## Save location
 
-Save the plan with `write_file` under:
+Save the plan with `hermes_file_write` using `mode: "create"` under:
 - `.hermes/plans/YYYY-MM-DD_HHMMSS-<slug>.md`
 
 Treat that as relative to the active working directory / backend workspace. Hermes file tools are backend-aware, so using this relative path keeps the plan with the workspace on local, docker, ssh, modal, and daytona backends.
@@ -195,16 +196,16 @@ Use Hermes tools to understand the project:
 
 ```python
 # Understand project structure
-search_files("*.py", target="files", path="src/")
+hermes_terminal(program="rg", arguments=["--files", "src/"])
 
 # Look at similar features
-search_files("similar_pattern", path="src/", file_glob="*.py")
+hermes_terminal(program="rg", arguments=["similar_pattern", "--glob", "*.py", "src/"])
 
 # Check existing tests
-search_files("*.py", target="files", path="tests/")
+hermes_terminal(program="rg", arguments=["--files", "tests/"])
 
 # Read key files
-read_file("src/app.py")
+hermes_file_read(path="src/app.py")
 ```
 
 ### Step 3: Design Approach
@@ -315,13 +316,13 @@ git commit -m "type: description"
 
 After saving the plan, offer the execution approach:
 
-**"Plan complete and saved. Ready to execute using subagent-driven-development — I'll dispatch a fresh subagent per task with two-stage review (spec compliance then code quality). Shall I proceed?"**
+**"Plan complete and saved. Ready to execute the tasks sequentially with
+spec-compliance and code-quality checks after each task. Shall I proceed?"**
 
-When executing, use the `subagent-driven-development` skill:
-- Fresh `delegate_task` per task with full context
-- Spec compliance review after each task
-- Code quality review after spec passes
-- Proceed only when both reviews approve
+When executing, follow the `subagent-driven-development` review sequence when
+that optional integration is available. Otherwise execute each task in the
+current agent and perform the same spec-compliance and code-quality checks
+before proceeding.
 
 ## Remember
 

@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: songsee
 description: "Audio spectrograms/features (mel, chroma, MFCC) via CLI."
 version: 1.0.0

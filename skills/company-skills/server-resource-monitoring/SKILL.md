@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated, cronjob]
 name: server-resource-monitoring
 description: Set up or report Linux server resource watchdogs (especially disk usage) with quiet threshold-crossing alerts.
 version: 1.0.0
@@ -6,6 +7,11 @@ author: Hermes Agent
 ---
 
 # Server Resource Monitoring
+
+Run filesystem probes and script setup through
+`hermes_terminal_authenticated`: the documented `~/.hermes` script path must
+persist in the user's real home. The user must complete any interactive setup
+outside the tool because terminal stdin is closed.
 
 ## Use when
 

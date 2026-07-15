@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write, hermes_skill_resource_path, hermes_terminal, hermes_terminal_authenticated]
 name: comfyui
 description: "Generate images, video, and audio with ComfyUI — install, launch, manage nodes/models, run workflows with parameter injection. Uses the official comfy-cli for lifecycle and direct REST/WebSocket API for execution."
 version: 5.1.0
@@ -9,7 +10,7 @@ compatibility: "Requires ComfyUI (local, Comfy Desktop, or Comfy Cloud) and comf
 prerequisites:
   commands: ["python3"]
 setup:
-  help: "Run scripts/hardware_check.py FIRST to decide local vs Comfy Cloud; then scripts/comfyui_setup.sh auto-installs locally (or use Cloud API key for platform.comfy.org)."
+  help: "Resolve scripts/hardware_check.py with hermes_skill_resource_path and run it FIRST to decide local vs Comfy Cloud; then resolve scripts/comfyui_setup.sh and run it for local installation (or use a Cloud API key)."
 metadata:
   hermes:
     tags:
@@ -32,6 +33,60 @@ metadata:
 Generate images, video, audio, and 3D content through ComfyUI using the
 official `comfy-cli` for setup/lifecycle and direct REST/WebSocket API
 for workflow execution.
+
+## Running bundled scripts
+
+ComfyUI commands that need the persistent HOME or a Cloud API key must start
+through `hermes_terminal_authenticated`.  A foreground terminal call defaults
+to 30 seconds and is hard-capped at 300 seconds.  Use `timeout=300` only when
+the entire command is expected to finish within five minutes.
+
+For a bounded image job, keep the script's own deadline below the terminal
+deadline so it has time to report and clean up:
+
+```text
+hermes_terminal_authenticated(program="python3", arguments=["/absolute/path/returned-by-hermes_skill_resource_path", "--workflow", "workflow_api.json", "--args", "{\"prompt\":\"...\"}", "--timeout", "240", "--output-dir", "outputs"], timeout=300)
+```
+
+Never run setup, package/node installation, model downloads, batches, or
+video/audio workflows as foreground terminal calls: they can exceed the hard
+cap.  On macOS/Linux, launch them detached with redirected standard streams,
+then poll the PID/log with the sanitized terminal.  This example passes the
+command as argv after `sh`, so workflow values are not interpolated as shell
+code:
+
+```text
+hermes_terminal_authenticated(program="sh", arguments=["-c", "set -eu; nohup \"$@\" >comfyui-job.log 2>&1 </dev/null & echo $! >comfyui-job.pid", "sh", "python3", "/absolute/path/returned-by-hermes_skill_resource_path", "--workflow", "workflow_api.json", "--args", "{\"prompt\":\"...\"}", "--output-dir", "outputs"], timeout=30)
+hermes_terminal(program="sh", arguments=["-c", "set -eu; pid=$(cat comfyui-job.pid); if kill -0 \"$pid\" 2>/dev/null; then echo running; else echo finished; fi; tail -n 80 comfyui-job.log"], timeout=30)
+```
+
+Use a unique PID/log basename for concurrent jobs.  To cancel, run `kill`
+against the recorded PID through `hermes_terminal`.  On Windows, use Comfy
+Desktop or ask the user to start the command in an external process manager;
+do not send a long foreground call and imply that its internal timeout can
+override the Hermes cap.
+
+The setup persists installs and configuration under HOME, and Cloud API keys
+are environment variables that the standard terminal deliberately strips.
+For Cloud, set the key in Emacs before sending the task; authenticated
+terminal inherits it and separate terminal calls do not share shell exports:
+
+```elisp
+(progn
+  (setenv "COMFY_CLOUD_API_KEY" (read-passwd "Comfy Cloud API key: "))
+  nil)
+```
+
+Do not put the key in the prompt or save it in a Skill/workspace file.
+
+The scripts and workflow JSON files below are bundled resources, not files in
+the user's workspace. Before running one, call
+`hermes_skill_resource_path(name="comfyui", resource="scripts/name.py")` or
+`hermes_skill_resource_path(name="comfyui", resource="workflows/name.json")`.
+Set `SKILL_DIR` to the returned `Skill directory` value, not the directory
+containing the returned `Effective path`.
+Replace that placeholder with the real absolute directory in each terminal
+call; terminal processes do not share shell variables.
 
 ## What's in this skill
 
@@ -108,7 +163,7 @@ command -v comfy >/dev/null 2>&1 && echo "comfy-cli: installed"
 curl -s http://127.0.0.1:8188/system_stats 2>/dev/null && echo "server: running"
 
 # Can this machine run ComfyUI locally? (GPU/VRAM/disk check)
-python3 scripts/hardware_check.py
+python3 "$SKILL_DIR"/scripts/hardware_check.py
 ```
 
 If nothing is installed, see **Setup & Onboarding** below — but always run the
@@ -117,7 +172,7 @@ hardware check first.
 ### One-line health check
 
 ```bash
-python3 scripts/health_check.py
+python3 "$SKILL_DIR"/scripts/health_check.py
 # → JSON: comfy_cli on PATH? server reachable? at least one checkpoint? smoke-test passes?
 ```
 
@@ -139,10 +194,10 @@ executable**. The scripts detect this and tell you to re-export.
 ### Step 2: See what's controllable
 
 ```bash
-python3 scripts/extract_schema.py workflow_api.json --summary-only
+python3 "$SKILL_DIR"/scripts/extract_schema.py workflow_api.json --summary-only
 # → {"parameter_count": 12, "has_negative_prompt": true, "has_seed": true, ...}
 
-python3 scripts/extract_schema.py workflow_api.json
+python3 "$SKILL_DIR"/scripts/extract_schema.py workflow_api.json
 # → full schema with parameters, model deps, embedding refs
 ```
 
@@ -150,33 +205,32 @@ python3 scripts/extract_schema.py workflow_api.json
 
 ```bash
 # Local (defaults to http://127.0.0.1:8188)
-python3 scripts/run_workflow.py \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
   --workflow workflow_api.json \
   --args '{"prompt": "a beautiful sunset over mountains", "seed": -1, "steps": 30}' \
   --output-dir ./outputs
 
-# Cloud (export API key once; uses correct /api routing automatically)
-export COMFY_CLOUD_API_KEY="comfyui-..."
-python3 scripts/run_workflow.py \
+# Cloud (COMFY_CLOUD_API_KEY is inherited from Emacs; see above)
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
   --workflow workflow_api.json \
   --args '{"prompt": "..."}' \
   --host https://cloud.comfy.org \
   --output-dir ./outputs
 
 # Real-time progress via WebSocket (requires `pip install websocket-client`)
-python3 scripts/run_workflow.py \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
   --workflow flux_dev.json \
   --args '{"prompt": "..."}' \
   --ws
 
 # img2img / inpaint: pass --input-image to upload + reference automatically
-python3 scripts/run_workflow.py \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
   --workflow sdxl_img2img.json \
   --input-image image=./photo.png \
   --args '{"prompt": "make it watercolor", "denoise": 0.6}'
 
 # Batch / sweep: 8 random seeds, parallel up to cloud tier limit
-python3 scripts/run_batch.py \
+python3 "$SKILL_DIR"/scripts/run_batch.py \
   --workflow sdxl.json \
   --args '{"prompt": "abstract"}' \
   --count 8 --randomize-seed --parallel 3 \
@@ -206,7 +260,7 @@ The scripts emit JSON to stdout describing every output file:
 | User says | Tool | Command |
 |-----------|------|---------|
 | **Lifecycle (use comfy-cli)** | | |
-| "install ComfyUI" | comfy-cli | `bash scripts/comfyui_setup.sh` |
+| "install ComfyUI" | comfy-cli | `bash "$SKILL_DIR"/scripts/comfyui_setup.sh` |
 | "start ComfyUI" | comfy-cli | `comfy launch --background` |
 | "stop ComfyUI" | comfy-cli | `comfy stop` |
 | "install X node" | comfy-cli | `comfy node install <name>` |
@@ -266,9 +320,9 @@ Routing:
 ### Step 1: Verify Hardware (ONLY if user chose local)
 
 ```bash
-python3 scripts/hardware_check.py --json
+python3 "$SKILL_DIR"/scripts/hardware_check.py --json
 # Optional: also probe `torch` for actual CUDA/MPS:
-python3 scripts/hardware_check.py --json --check-pytorch
+python3 "$SKILL_DIR"/scripts/hardware_check.py --json --check-pytorch
 ```
 
 | Verdict    | Meaning                                                       | Action |
@@ -302,9 +356,9 @@ user has already told you their hardware:
 For the fully automated path (hardware check → install → launch → verify):
 
 ```bash
-bash scripts/comfyui_setup.sh
+bash "$SKILL_DIR"/scripts/comfyui_setup.sh
 # Or with overrides:
-bash scripts/comfyui_setup.sh --m-series --port=8190 --workspace=/data/comfy
+bash "$SKILL_DIR"/scripts/comfyui_setup.sh --m-series --port=8190 --workspace=/data/comfy
 ```
 
 It runs `hardware_check.py` internally, refuses to install locally when the
@@ -322,14 +376,16 @@ For users without a capable GPU or who want zero setup. Hosted on RTX 6000 Pro.
 
 1. Sign up at https://comfy.org/cloud
 2. Generate an API key at https://platform.comfy.org/login
-3. Set the key:
-   ```bash
-   export COMFY_CLOUD_API_KEY="comfyui-xxxxxxxxxxxx"
+3. Set the key in Emacs before running the authenticated terminal command:
+   ```elisp
+   (progn
+     (setenv "COMFY_CLOUD_API_KEY" (read-passwd "Comfy Cloud API key: "))
+     nil)
    ```
 4. Run workflows:
    ```bash
-   python3 scripts/run_workflow.py \
-     --workflow workflows/flux_dev_txt2img.json \
+   python3 "$SKILL_DIR"/scripts/run_workflow.py \
+     --workflow "$SKILL_DIR"/workflows/flux_dev_txt2img.json \
      --args '{"prompt": "..."}' \
      --host https://cloud.comfy.org \
      --output-dir ./outputs
@@ -465,14 +521,14 @@ comfy node install-deps --workflow=workflow.json   # install everything a workfl
 ### Post-Install: Verify
 
 ```bash
-python3 scripts/health_check.py
+python3 "$SKILL_DIR"/scripts/health_check.py
 # → comfy_cli on PATH? server reachable? checkpoints? smoke test?
 
-python3 scripts/check_deps.py my_workflow.json
+python3 "$SKILL_DIR"/scripts/check_deps.py my_workflow.json
 # → are this workflow's nodes/models/embeddings installed?
 
-python3 scripts/run_workflow.py \
-  --workflow workflows/sd15_txt2img.json \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
+  --workflow "$SKILL_DIR"/workflows/sd15_txt2img.json \
   --args '{"prompt": "test", "steps": 4}' \
   --output-dir ./test-outputs
 ```
@@ -482,8 +538,8 @@ python3 scripts/run_workflow.py \
 The simplest way is to use `--input-image` with `run_workflow.py`:
 
 ```bash
-python3 scripts/run_workflow.py \
-  --workflow workflows/sdxl_img2img.json \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
+  --workflow "$SKILL_DIR"/workflows/sdxl_img2img.json \
   --input-image image=./photo.png \
   --args '{"prompt": "make it cyberpunk", "denoise": 0.6}'
 ```
@@ -492,8 +548,8 @@ The flag uploads `photo.png`, then injects its server-side filename into
 whatever schema parameter is named `image`. For inpainting, pass both:
 
 ```bash
-python3 scripts/run_workflow.py \
-  --workflow workflows/sdxl_inpaint.json \
+python3 "$SKILL_DIR"/scripts/run_workflow.py \
+  --workflow "$SKILL_DIR"/workflows/sdxl_inpaint.json \
   --input-image image=./photo.png \
   --input-image mask_image=./mask.png \
   --args '{"prompt": "fill with flowers"}'
@@ -515,7 +571,7 @@ curl -X POST "https://cloud.comfy.org/api/upload/image" \
 
 - **Base URL:** `https://cloud.comfy.org`
 - **Auth:** `X-API-Key` header (or `?token=KEY` for WebSocket)
-- **API key:** set `$COMFY_CLOUD_API_KEY` once and the scripts pick it up automatically
+- **API key:** set `COMFY_CLOUD_API_KEY` in Emacs as described above; authenticated terminal calls inherit it
 - **Output download:** `/api/view` returns a 302 to a signed URL; the scripts
   follow it and strip `X-API-Key` before fetching from the storage backend
   (don't leak the API key to S3/CloudFront).
@@ -544,7 +600,7 @@ curl -X POST http://127.0.0.1:8188/free \
   -d '{"unload_models": true, "free_memory": true}'
 
 # Cloud — same paths under /api/, plus:
-python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
+python3 "$SKILL_DIR"/scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
 ```
 
 ## Pitfalls
@@ -577,8 +633,10 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
    `check_deps.py` handle this gracefully and surface a clear message.
 
 7. **Timeout for video/audio workflows** — auto-detected when an output node
-   is `VHS_VideoCombine`, `SaveVideo`, etc.; the default jumps from 300 s to
-   900 s. Override explicitly with `--timeout 1800`.
+   is `VHS_VideoCombine`, `SaveVideo`, etc.; the script default jumps from
+   300 s to 900 s.  That internal timeout does not extend Hermes's 300-second
+   hard cap.  Run these jobs detached or externally; `--timeout 1800` is only
+   meaningful in that detached/external process.
 
 8. **Path traversal in output filenames** — server-supplied filenames are
    passed through `safe_path_join` to refuse anything escaping `--output-dir`.
@@ -599,7 +657,7 @@ python3 scripts/fetch_logs.py --tail-queue --host https://cloud.comfy.org
 
 ## Verification Checklist
 
-Use `python3 scripts/health_check.py` to run the whole list at once. Manual:
+Use `python3 "$SKILL_DIR"/scripts/health_check.py` to run the whole list at once. Manual:
 
 - [ ] `hardware_check.py` verdict is `ok` OR the user explicitly chose Comfy Cloud
 - [ ] `comfy --version` works (or `uvx --from comfy-cli comfy --help`)

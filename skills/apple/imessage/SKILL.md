@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: imessage
 description: Send and receive iMessages/SMS via the imsg CLI on macOS.
 version: 1.0.0
@@ -20,7 +21,7 @@ Use `imsg` to read and send iMessage/SMS via macOS Messages.app.
 
 - **macOS** with Messages.app signed in
 - Install: `brew install steipete/tap/imsg`
-- Grant Full Disk Access for terminal (System Settings → Privacy → Full Disk Access)
+- Grant Full Disk Access for the calling Emacs process (System Settings → Privacy → Full Disk Access)
 - Grant Automation permission for Messages.app when prompted
 
 ## When to Use

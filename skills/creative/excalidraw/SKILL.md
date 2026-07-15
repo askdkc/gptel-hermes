@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write, hermes_skill_resource_path, hermes_terminal]
 name: excalidraw
 description: "Hand-drawn Excalidraw JSON diagrams (arch, flow, seq)."
 version: 1.0.0
@@ -25,12 +26,16 @@ Generate `.excalidraw` files for architecture diagrams, flowcharts, sequence dia
 
 1. **Load this skill** (you already did)
 2. **Write the elements JSON** -- an array of Excalidraw element objects
-3. **Save the file** using `write_file` to create a `.excalidraw` file
-4. **Optionally upload** for a shareable link using `scripts/upload.py` via `terminal`
+3. **Save the file** using `hermes_file_write` with `mode: "create"` to a
+   workspace-relative `.excalidraw` file
+4. **Optionally upload** for a shareable link. Resolve
+   `scripts/upload.py` with `hermes_skill_resource_path` first, then run the
+   returned absolute path via `hermes_terminal` with an argv array.
 
 ### Saving a Diagram
 
-Wrap your elements array in the standard `.excalidraw` envelope and save with `write_file`:
+Wrap your elements array in the standard `.excalidraw` envelope and save with
+`hermes_file_write`:
 
 ```json
 {
@@ -44,14 +49,14 @@ Wrap your elements array in the standard `.excalidraw` envelope and save with `w
 }
 ```
 
-Save to any path, e.g. `~/diagrams/my_diagram.excalidraw`.
+Save under the workspace, e.g. `diagrams/my_diagram.excalidraw`.
 
 ### Uploading for a Shareable Link
 
 Run the upload script (located in this skill's `scripts/` directory) via terminal:
 
 ```bash
-python skills/diagramming/excalidraw/scripts/upload.py ~/diagrams/my_diagram.excalidraw
+python /absolute/path/returned-by-hermes_skill_resource_path diagrams/my_diagram.excalidraw
 ```
 
 This uploads to excalidraw.com (no account needed) and prints a shareable URL. Requires the `cryptography` pip package (`pip install cryptography`).
@@ -195,5 +200,3 @@ See `references/colors.md` for full color tables. Quick reference:
 - Do NOT use emoji in text -- they don't render in Excalidraw's font
 - For dark mode diagrams, see `references/dark-mode.md`
 - For larger examples, see `references/examples.md`
-
-

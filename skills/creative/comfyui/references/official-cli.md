@@ -92,7 +92,7 @@ comfy stop
 
 Submit a raw workflow JSON to a running server. **Limited** — no parameter
 injection, no structured output download. For agents, use
-`scripts/run_workflow.py` instead.
+`$SKILL_DIR/scripts/run_workflow.py` instead.
 
 ```bash
 comfy run --workflow workflow_api.json

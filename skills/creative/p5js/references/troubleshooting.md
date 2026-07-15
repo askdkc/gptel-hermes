@@ -433,8 +433,8 @@ function setup() { createCanvas(800, 800); }
 
 ```javascript
 // Loading images/fonts from external URLs requires CORS headers
-// Local files need a server:
-// python3 -m http.server 8080
+// Local files need a server. From Hermes, use the detached start/verify/stop
+// calls in SKILL.md Step 4; do not run a foreground http.server call.
 
 // Or use a CORS proxy for external resources (not recommended for production)
 ```

@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write, hermes_terminal, browser_navigate, browser_vision]
 name: sketch
 description: "Throwaway HTML mockups: 2-3 design variants to compare."
 version: 1.0.0
@@ -204,10 +205,11 @@ Propose 2-4 named candidates. Let the user pick.
 **Typical tool sequence for one variant:**
 
 ```
-terminal("mkdir -p sketches/001-calm-editorial")
-write_file("sketches/001-calm-editorial/index.html", "<!doctype html>...")
-write_file("sketches/001-calm-editorial/README.md", "## Variant: Calm editorial\n...")
-browser_navigate(url="file://$(pwd)/sketches/001-calm-editorial/index.html")
+hermes_file_write(path="sketches/001-calm-editorial/index.html", content="<!doctype html>...", mode="create")
+hermes_file_write(path="sketches/001-calm-editorial/README.md", content="## Variant: Calm editorial\n...", mode="create")
+hermes_terminal(program="pwd", arguments=[])
+# Replace /absolute/workspace with the returned absolute workspace path.
+browser_navigate(url="file:///absolute/workspace/sketches/001-calm-editorial/index.html")
 browser_vision(question="How does this look? Any obvious layout issues?")
 ```
 

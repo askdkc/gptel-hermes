@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_read, hermes_file_write, hermes_skill_resource_path, hermes_terminal]
 name: powerpoint
 description: "Create, read, edit .pptx decks, slides, notes, templates."
 license: Proprietary. LICENSE.txt has complete terms
@@ -23,15 +24,25 @@ Use this skill any time a .pptx file is involved in any way — as input, output
 
 ## Reading Content
 
+The bundled helper scripts are package resources, not workspace files. Before
+running `add_slide.py` or `clean.py`, call
+`hermes_skill_resource_path(name="powerpoint", resource="scripts/add_slide.py")`
+or the corresponding resource and use its returned absolute `Effective path`.
+For the shell examples in `editing.md`, set `SKILL_DIR` to the returned
+`Skill directory`; do not derive it from the resource file path.
+
 ```bash
 # Text extraction
 python -m markitdown presentation.pptx
 
 # Visual overview
-python scripts/thumbnail.py presentation.pptx
+mkdir -p thumbnails
+soffice --headless --convert-to pdf --outdir thumbnails presentation.pptx
+pdftoppm -jpeg -r 120 thumbnails/presentation.pdf thumbnails/slide
 
 # Raw XML
-python scripts/office/unpack.py presentation.pptx unpacked/
+mkdir -p unpacked
+unzip -q presentation.pptx -d unpacked/
 ```
 
 ---
@@ -40,7 +51,7 @@ python scripts/office/unpack.py presentation.pptx unpacked/
 
 **Read [editing.md](editing.md) for full details.**
 
-1. Analyze template with `thumbnail.py`
+1. Analyze template with `soffice` and `pdftoppm`
 2. Unpack → manipulate slides → edit content → clean → pack
 
 ---
@@ -214,7 +225,7 @@ Report ALL issues found, including minor ones.
 Convert presentations to individual slide images for visual inspection:
 
 ```bash
-python scripts/office/soffice.py --headless --convert-to pdf output.pptx
+soffice --headless --convert-to pdf output.pptx
 pdftoppm -jpeg -r 150 output.pdf slide
 ```
 
@@ -231,7 +242,7 @@ pdftoppm -jpeg -r 150 -f N -l N output.pdf slide-fixed
 ## Dependencies
 
 - `pip install "markitdown[pptx]"` - text extraction
-- `pip install Pillow` - thumbnail grids
 - `npm install -g pptxgenjs` - creating from scratch
-- LibreOffice (`soffice`) - PDF conversion (auto-configured for sandboxed environments via `scripts/office/soffice.py`)
+- `unzip`/`zip` - unpacking and repacking the Office package
+- LibreOffice (`soffice`) - PDF conversion
 - Poppler (`pdftoppm`) - PDF to images

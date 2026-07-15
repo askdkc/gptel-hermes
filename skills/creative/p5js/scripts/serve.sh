@@ -1,6 +1,8 @@
 #!/bin/bash
 # p5.js Skill — Local Development Server
 # Serves the current directory over HTTP for loading local assets (fonts, images)
+# This script stays in the foreground.  From Hermes, launch a detached server
+# with redirected stdio and clean it up as documented in SKILL.md Step 4.
 #
 # Usage:
 #   bash scripts/serve.sh [port] [directory]

@@ -20,7 +20,7 @@ for r in d.get('web',{}).get('results',[]):
 "
 ```
 
-Key: `source ~/.hermes/.env` loads API key into shell. The `.env` file is NOT automatically sourced for every `terminal()` call — must be explicit.
+Key: `source ~/.hermes/.env` loads API key into shell. The `.env` file is NOT automatically sourced for every `hermes_terminal_authenticated` call — must be explicit.
 
 ## 2. Jina AI Reader for JS-rendered pages
 

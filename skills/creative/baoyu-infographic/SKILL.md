@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_write, hermes_terminal, image_gen]
 name: baoyu-infographic
 description: "Infographics: 21 layouts x 21 styles (信息图, 可视化)."
 version: 1.56.1
@@ -146,7 +147,8 @@ Slug: 2-4 words kebab-case from topic. Conflict: append `-YYYYMMDD-HHMMSS`.
 
 **Load references**: Read `references/analysis-framework.md` from this skill.
 
-1. Save source content (file path or paste → `source.md` using `write_file`)
+1. Save source content (file path or paste → `source.md` using
+   `hermes_file_write` with `mode: "create"`; read first if replacing)
    - **Backup rule**: If `source.md` exists, rename to `source-backup-YYYYMMDD-HHMMSS.md`
 2. Analyze: topic, data type, complexity, tone, audience
 3. Detect source language and user language
@@ -180,7 +182,7 @@ See `references/structured-content-template.md` for detailed format.
 
 ### Step 4: Confirm Options
 
-Use the `clarify` tool to confirm options with the user. Since `clarify` handles one question at a time, ask the most important question first:
+If the choices are materially underspecified, ask the user in the conversation. Ask one question at a time and do not block the workflow on an optional clarification integration:
 
 **Q1 — Combination**: Present 3+ layout×style combos with rationale. Ask user to pick one.
 
@@ -205,13 +207,15 @@ Combine:
 - Named presets → ratio string: landscape→`16:9`, portrait→`9:16`, square→`1:1`
 - Custom W:H ratios → use as-is (e.g., `3:4`, `4:3`, `2.35:1`)
 
-Save the assembled prompt to `prompts/infographic.md` using `write_file`.
+Save the assembled prompt to `prompts/infographic.md` using
+`hermes_file_write` with `mode: "create"`, or use a SHA-checked replace after
+reading an existing file.
 
 ### Step 6: Generate Image
 
-Use the `image_generate` tool with the assembled prompt from Step 5.
+Use the `image_gen` tool with the assembled prompt from Step 5.
 
-- Map aspect ratio to image_generate's format: `16:9` → `landscape`, `9:16` → `portrait`, `1:1` → `square`
+- Map aspect ratio to image_gen's format: `16:9` → `landscape`, `9:16` → `portrait`, `1:1` → `square`
 - For custom ratios, pick the closest named aspect
 - On failure, auto-retry once
 - Save the resulting image URL/path to the output directory
@@ -234,4 +238,4 @@ Report: topic, layout, style, aspect, language, output path, files created.
 2. **Strip secrets** — always scan source content for API keys, tokens, or credentials before including in any output file.
 3. **One message per section** — each infographic section should convey one clear concept. Overloading sections reduces readability.
 4. **Style consistency** — the style definition from the references file must be applied consistently across the entire infographic. Don't mix styles.
-5. **image_generate aspect ratios** — the tool only supports `landscape`, `portrait`, and `square`. Custom ratios like `3:4` should map to the nearest option (portrait in that case).
+5. **image_gen aspect ratios** — the tool only supports `landscape`, `portrait`, and `square`. Custom ratios like `3:4` should map to the nearest option (portrait in that case).

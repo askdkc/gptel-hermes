@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: serving-llms-vllm
 description: "vLLM: high-throughput LLM serving, OpenAI API, quantization."
 version: 1.0.0
@@ -13,6 +14,16 @@ metadata:
 ---
 
 # vLLM - High-Performance LLM Serving
+
+Use `hermes_terminal_authenticated` only for finite vLLM commands such as
+health checks, client requests, and metrics collection. Do not start
+`vllm serve` through this package's one-shot terminal: it has a bounded
+timeout and does not provide background-process management.
+
+Start the server in the user's terminal or under an external process manager
+such as systemd, Docker Compose, supervisord, or a cluster scheduler. Keep the
+server's model/cache HOME and logs under that manager's persistent environment;
+then use this skill to run finite checks against the running endpoint.
 
 ## When to use
 
@@ -38,7 +49,7 @@ outputs = llm.generate(["Explain quantum computing"], sampling)
 print(outputs[0].outputs[0].text)
 ```
 
-**OpenAI-compatible server**:
+**OpenAI-compatible server (run by the user or an external process manager)**:
 ```bash
 vllm serve meta-llama/Llama-3-8B-Instruct
 
@@ -54,6 +65,10 @@ print(client.chat.completions.create(
 ```
 
 ## Common workflows
+
+Every `vllm serve` command in this section is a user-terminal or external
+process-manager command. Never send it to `hermes_terminal_authenticated`;
+use that tool only for finite commands after the server is running.
 
 ### Workflow 1: Production API deployment
 
@@ -367,6 +382,3 @@ Supported platforms: NVIDIA (primary), AMD ROCm, Intel GPUs, TPUs
 - GitHub: https://github.com/vllm-project/vllm
 - Paper: "Efficient Memory Management for Large Language Model Serving with PagedAttention" (SOSP 2023)
 - Community: https://discuss.vllm.ai
-
-
-

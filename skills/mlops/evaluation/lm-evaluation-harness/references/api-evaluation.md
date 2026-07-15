@@ -32,8 +32,13 @@ The lm-evaluation-harness supports evaluating API-based models through a unified
 
 ### Setup
 
-```bash
-export OPENAI_API_KEY=sk-...
+Set the key in Emacs before using `hermes_terminal_authenticated`; do not put
+it in a prompt, Skill file, workspace file, or command output:
+
+```elisp
+(progn
+  (setenv "OPENAI_API_KEY" (read-passwd "OpenAI API key: "))
+  nil)
 ```
 
 ### Completion Models (Legacy)
@@ -117,8 +122,12 @@ print(f"Estimated cost: ${total_cost:.2f}")
 
 ### Setup
 
-```bash
-export ANTHROPIC_API_KEY=sk-ant-...
+Set the key in Emacs before using `hermes_terminal_authenticated`:
+
+```elisp
+(progn
+  (setenv "ANTHROPIC_API_KEY" (read-passwd "Anthropic API key: "))
+  nil)
 ```
 
 ### Completion Models (Legacy)
@@ -414,8 +423,8 @@ lm_eval --model openai-chat-completions \
 
 Check API key:
 ```bash
-echo $OPENAI_API_KEY  # Should print sk-...
-echo $ANTHROPIC_API_KEY  # Should print sk-ant-...
+test -n "$OPENAI_API_KEY" && echo "OPENAI_API_KEY is set" || echo "OPENAI_API_KEY is missing"
+test -n "$ANTHROPIC_API_KEY" && echo "ANTHROPIC_API_KEY is set" || echo "ANTHROPIC_API_KEY is missing"
 ```
 
 ### "Rate limit exceeded"

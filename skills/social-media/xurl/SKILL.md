@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: xurl
 description: "X/Twitter via xurl CLI: post, search, DM, media, v2 API."
 version: 1.1.1
@@ -17,6 +18,10 @@ metadata:
 # xurl — X (Twitter) API via the Official CLI
 
 `xurl` is the X developer platform's official CLI for the X API. It supports shortcut commands for common actions AND raw curl-style access to any v2 endpoint. All commands return JSON to stdout.
+
+Run non-interactive commands below through `hermes_terminal_authenticated`.
+OAuth setup and credential registration remain user-run steps because terminal
+stdin is closed.
 
 Use this skill for:
 - posting, replying, quoting, deleting posts

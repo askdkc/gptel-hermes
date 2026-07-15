@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal, hermes_skill_resource_path]
 name: youtube-content
 description: "YouTube transcripts to summaries, threads, blogs."
 platforms: [linux, macos, windows]
@@ -23,20 +24,25 @@ uv pip install youtube-transcript-api
 
 ## Helper Script
 
-`SKILL_DIR` is the directory containing this SKILL.md file. The script accepts any standard YouTube URL format, short links (youtu.be), shorts, embeds, live links, or a raw 11-character video ID.
+Before running the helper, call
+`hermes_skill_resource_path(name="youtube-content", resource="scripts/fetch_transcript.py")`.
+Use its returned absolute `Effective path` directly in each terminal call; do
+not use a workspace-relative `scripts/` path or a shell variable from a prior
+call. The script accepts any standard YouTube URL format, short links
+(youtu.be), shorts, embeds, live links, or a raw 11-character video ID.
 
 ```bash
 # JSON output with metadata
-uv run python3 SKILL_DIR/scripts/fetch_transcript.py "https://youtube.com/watch?v=VIDEO_ID"
+uv run python3 "/absolute/path/returned-by-hermes_skill_resource_path" "https://youtube.com/watch?v=VIDEO_ID"
 
 # Plain text (good for piping into further processing)
-uv run python3 SKILL_DIR/scripts/fetch_transcript.py "URL" --text-only
+uv run python3 "/absolute/path/returned-by-hermes_skill_resource_path" "URL" --text-only
 
 # With timestamps
-uv run python3 SKILL_DIR/scripts/fetch_transcript.py "URL" --timestamps
+uv run python3 "/absolute/path/returned-by-hermes_skill_resource_path" "URL" --timestamps
 
 # Specific language with fallback chain
-uv run python3 SKILL_DIR/scripts/fetch_transcript.py "URL" --language tr,en
+uv run python3 "/absolute/path/returned-by-hermes_skill_resource_path" "URL" --language tr,en
 ```
 
 ## Output Formats

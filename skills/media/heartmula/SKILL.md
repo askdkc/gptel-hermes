@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: heartmula
 description: "HeartMuLa: Suno-like song generation from lyrics + tags."
 version: 1.0.0
@@ -30,11 +31,15 @@ HeartMuLa is a family of open-source music foundation models (Apache-2.0) that g
 - **Multi-GPU**: Use `--mula_device cuda:0 --codec_device cuda:1` to split across GPUs
 - 3B model with lazy_load peaks at ~6.2GB VRAM
 
+Run installation, model downloads, and generation through
+`hermes_terminal_authenticated`; the checkout, virtual environment, and model
+files must persist outside the standard terminal's temporary HOME.
+
 ## Installation Steps
 
 ### 1. Clone Repository
 ```bash
-cd ~/  # or desired directory
+cd /path/to/parent  # choose a persistent checkout directory
 git clone https://github.com/HeartMuLa/heartlib.git
 cd heartlib
 ```

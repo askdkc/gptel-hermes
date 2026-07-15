@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_file_write, hermes_skill_resource_path, hermes_terminal]
 name: p5js
 description: "p5.js sketches: gen art, shaders, interactive, 3D."
 version: 1.0.0
@@ -14,6 +15,12 @@ metadata:
 ## When to use
 
 Use when users request: p5.js sketches, creative coding, generative art, interactive visualizations, canvas animations, browser-based visual art, data viz, shader effects, or any p5.js project.
+
+The bundled `scripts/` helpers are package resources, not workspace files.
+Before using one, call `hermes_skill_resource_path` for the requested resource
+and pass its returned absolute `Effective path` directly to the terminal. Do
+not use a workspace-relative `scripts/` path or a shell variable from another
+terminal call.
 
 ## What's inside
 
@@ -254,7 +261,21 @@ Key implementation patterns:
 ### Step 4: Preview & Iterate
 
 - Open HTML file directly in browser — no server needed for basic sketches
-- For `loadImage()`/`loadFont()` from local files: use `scripts/serve.sh` or `python3 -m http.server`
+- For `loadImage()`/`loadFont()` from local files, start the HTTP server
+  detached.  A foreground server blocks until Hermes kills it, so it cannot
+  support a later preview call.  Run these as separate tool calls from the
+  project directory:
+
+```text
+hermes_terminal(program="sh", arguments=["-c", "set -eu; nohup \"$@\" >p5-server.log 2>&1 </dev/null & echo $! >p5-server.pid", "sh", "python3", "-m", "http.server", "8080", "--bind", "127.0.0.1"], cwd="path/to/project", timeout=30)
+hermes_terminal(program="sh", arguments=["-c", "set -eu; test -s p5-server.pid; kill -0 \"$(cat p5-server.pid)\"; curl -fsS --retry 10 --retry-connrefused --retry-delay 1 http://127.0.0.1:8080/sketch.html >/dev/null"], cwd="path/to/project", timeout=30)
+```
+
+  Stop it after preview so no orphan server remains:
+
+```text
+hermes_terminal(program="sh", arguments=["-c", "if test -s p5-server.pid; then kill \"$(cat p5-server.pid)\" 2>/dev/null || true; rm -f p5-server.pid; fi"], cwd="path/to/project", timeout=30)
+```
 - Chrome DevTools Performance tab to verify 60fps
 - Test at target export resolution, not just the window size
 - Adjust parameters until the visual matches the concept from Step 1
@@ -264,10 +285,10 @@ Key implementation patterns:
 | Format | Method | Command |
 |--------|--------|---------|
 | **PNG** | `saveCanvas('output', 'png')` in `keyPressed()` | Press 's' to save |
-| **High-res PNG** | Puppeteer headless capture | `node scripts/export-frames.js sketch.html --width 3840 --height 2160 --frames 1` |
+| **High-res PNG** | Puppeteer headless capture | `node "/absolute/path/returned-by-hermes_skill_resource_path" sketch.html --width 3840 --height 2160 --frames 1` |
 | **GIF** | `saveGif('output', 5)` — captures N seconds | Press 'g' to save |
 | **Frame sequence** | `saveFrames('frame', 'png', 10, 30)` — 10s at 30fps | Then `ffmpeg -i frame-%04d.png -c:v libx264 output.mp4` |
-| **MP4** | Puppeteer frame capture + ffmpeg | `bash scripts/render.sh sketch.html output.mp4 --duration 30 --fps 30` |
+| **MP4** | Puppeteer frame capture + ffmpeg | `bash "/absolute/path/returned-by-hermes_skill_resource_path" sketch.html output.mp4 --duration 30 --fps 30` |
 | **SVG** | `createCanvas(w, h, SVG)` with p5.js-svg | `save('output.svg')` |
 
 ### Step 6: Quality Verification
@@ -486,12 +507,18 @@ When building p5.js sketches:
 
 1. **Write the HTML file** — single self-contained file, all code inline
 2. **Open in browser** — `open sketch.html` (macOS) or `xdg-open sketch.html` (Linux)
-3. **Local assets** (fonts, images) require a server: `python3 -m http.server 8080` in the project directory, then open `http://localhost:8080/sketch.html`
+3. **Local assets** (fonts, images) require the detached server and cleanup
+   commands in Step 4; never run `python3 -m http.server` directly through
+   `hermes_terminal`
 4. **Export PNG/GIF** — add `keyPressed()` shortcuts as shown above, tell the user which key to press
-5. **Headless export** — `node scripts/export-frames.js sketch.html --frames 300` for automated frame capture (sketch must use `noLoop()` + `_p5Ready`)
-6. **MP4 rendering** — `bash scripts/render.sh sketch.html output.mp4 --duration 30`
+5. **Headless export** — resolve `scripts/export-frames.js` with
+   `hermes_skill_resource_path`, then run it with `node` and the returned
+   absolute path (the sketch must use `noLoop()` + `_p5Ready`).
+6. **MP4 rendering** — resolve `scripts/render.sh` with
+   `hermes_skill_resource_path`, then run it with `bash` and the returned
+   absolute path.
 7. **Iterative refinement** — edit the HTML file, user refreshes browser to see changes
-8. **Load references on demand** — use `skill_view(name="p5js", file_path="references/...")` to load specific reference files as needed during implementation
+8. **Load references on demand** — use `hermes_skill_view(name="p5js", resource="references/...")` to load specific reference files as needed during implementation
 
 ## Performance Targets
 

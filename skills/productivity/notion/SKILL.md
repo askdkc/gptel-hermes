@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: notion
 description: "Notion API + ntn CLI: pages, databases, markdown, Workers."
 version: 2.0.0
@@ -20,16 +21,19 @@ Talk to Notion two ways. Same integration token works for both — pick by what'
 ◆ **`ntn` CLI** — Notion's official CLI. Shorter syntax, one-line file uploads, required for Workers. macOS + Linux only as of May 2026 (Windows support "coming soon"). **Default when installed.**
 ◆ **HTTP + curl** — works everywhere including Windows. **Default fallback** when `ntn` isn't installed.
 
+Run API and CLI commands below through `hermes_terminal_authenticated`. The
+user supplies the integration token; do not run interactive credential setup in
+the tool.
+
 ## Setup
 
 ### 1. Get an integration token (required for both paths)
 
 1. Create an integration at https://notion.so/my-integrations
 2. Copy the API key (starts with `ntn_` or `secret_`)
-3. Store in `${HERMES_HOME:-~/.hermes}/.env`:
-   ```
-   NOTION_API_KEY=ntn_your_key_here
-   ```
+3. Set `NOTION_API_KEY` in Emacs with
+   `(progn (setenv "NOTION_API_KEY" (read-passwd "Notion integration token: ")) nil)`.
+   Never commit a real key.
 4. **Share target pages/databases with the integration** in Notion: page menu `...` → `Connect to` → your integration name. Without this, the API returns 404 for that page even though it exists.
 
 ### 2. Install `ntn` (preferred path on macOS / Linux)
@@ -44,13 +48,18 @@ npm install --global ntn
 ntn --version    # verify
 ```
 
-**Skip `ntn login` — use the integration token instead.** This works headlessly, no browser needed:
-```bash
-export NOTION_API_TOKEN=$NOTION_API_KEY      # ntn reads NOTION_API_TOKEN
-export NOTION_KEYRING=0                       # don't try to use the OS keychain
+**Skip `ntn login` — use the integration token instead.** This works headlessly, no browser needed. Set both variables in Emacs before using the authenticated terminal; `ntn` reads `NOTION_API_TOKEN`, while the curl examples below use `NOTION_API_KEY`:
+
+```elisp
+(progn
+  (setenv "NOTION_API_KEY" (read-passwd "Notion integration token: "))
+  (setenv "NOTION_API_TOKEN" (getenv "NOTION_API_KEY"))
+  (setenv "NOTION_KEYRING" "0")
+  nil)
 ```
 
-Add those exports to your shell profile (or to `${HERMES_HOME:-~/.hermes}/.env`) so every session inherits them.
+The authenticated terminal inherits Emacs's environment. It does not source a
+`.env` file, so do not save the token there as a substitute for `setenv`.
 
 ### 3. Choose path at runtime
 

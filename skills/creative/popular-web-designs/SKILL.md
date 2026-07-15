@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_file_write, browser_vision]
 name: popular-web-designs
 description: 54 real design systems (Stripe, Linear, Vercel) as HTML/CSS.
 version: 1.0.0
@@ -37,14 +38,14 @@ system, shadows, responsive behavior, and practical agent prompts with exact CSS
 ## How to Use
 
 1. Pick a design from the catalog below
-2. Load it: `skill_view(name="popular-web-designs", file_path="templates/<site>.md")`
+2. Load it: `hermes_skill_view(name="popular-web-designs", resource="templates/<site>.md")`
 3. Use the design tokens and component specs when generating HTML
 4. Pair with the `generative-widgets` skill to serve the result via cloudflared tunnel
 
 Each template includes a **Hermes Implementation Notes** block at the top with:
 - CDN font substitute and Google Fonts `<link>` tag (ready to paste)
 - CSS font-family stacks for primary and monospace
-- Reminders to use `write_file` for HTML creation and `browser_vision` for verification
+  - Reminders to use `hermes_file_write` with `mode="create"` for HTML creation and `browser_vision` for verification
 
 ## HTML Generation Pattern
 
@@ -82,7 +83,7 @@ Each template includes a **Hermes Implementation Notes** block at the top with:
 </html>
 ```
 
-Write the file with `write_file`, serve with the `generative-widgets` workflow (cloudflared tunnel),
+Create the file with `hermes_file_write` using `mode="create"`, serve with the `generative-widgets` workflow (cloudflared tunnel),
 and verify the result with `browser_vision` to confirm visual accuracy.
 
 ## Font Substitution Reference

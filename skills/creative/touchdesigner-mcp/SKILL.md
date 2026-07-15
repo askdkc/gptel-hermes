@@ -1,4 +1,5 @@
 ---
+requires_tools: [td_get_par_info, td_get_operator_info, td_get_hints, td_get_focus, td_get_network, td_create_operator, td_execute_python, td_write_dat, td_set_operator_pars, td_get_errors, td_get_perf, td_get_screenshot]
 name: touchdesigner-mcp
 description: "Control a running TouchDesigner instance via twozero MCP — create operators, set parameters, wire connections, execute Python, build real-time visuals. 36 native tools."
 version: 1.1.0
@@ -25,33 +26,38 @@ metadata:
 ## Architecture
 
 ```
-Hermes Agent -> MCP (Streamable HTTP) -> twozero.tox (port 40404) -> TD Python
+gptel MCP bridge -> MCP (Streamable HTTP) -> twozero.tox (port 40404) -> TD Python
 ```
 
 36 native tools. Free plugin (no payment/license — confirmed April 2026).
 Context-aware (knows selected OP, current network).
 Hub health check: `GET http://localhost:40404/mcp` returns JSON with instance PID, project name, TD version.
 
-## Setup (Automated)
+## Setup for gptel
 
-Run the setup script to handle everything:
+`gptel-hermes` does not read Hermes Agent's `config.yaml` and does not
+register MCP servers. Do not run a Hermes-specific setup script expecting it to
+configure the current gptel buffer. Install twozero in TouchDesigner, enable
+its local MCP server, and register that server in the MCP bridge used by your
+gptel setup:
 
-```bash
-bash "${HERMES_HOME:-$HOME/.hermes}/skills/creative/touchdesigner-mcp/scripts/setup.sh"
+```yaml
+twozero_td:
+  url: http://127.0.0.1:40404/mcp
 ```
 
-The script will:
-1. Check if TD is running
-2. Download twozero.tox if not already cached
-3. Add `twozero_td` MCP server to Hermes config (if missing)
-4. Test the MCP connection on port 40404
-5. Report what manual steps remain (drag .tox into TD, enable MCP toggle)
+The bridge must expose the `td_*` tools to gptel (including
+`td_create_operator`) before this skill can build a network. Restart or
+reload that bridge after registering the server, then verify that the tools are
+available in the current gptel buffer. This package has no built-in MCP client,
+so the bridge/connector is an external prerequisite.
 
 ### Manual steps (one-time, cannot be automated)
 
 1. **Drag `~/Downloads/twozero.tox` into the TD network editor** → click Install
 2. **Enable MCP:** click twozero icon → Settings → mcp → "auto start MCP" → Yes
-3. **Restart Hermes session** to pick up the new MCP server
+3. Register `http://127.0.0.1:40404/mcp` in the external gptel MCP bridge
+4. Reload the bridge and confirm the `td_*` tools are visible to gptel
 
 After setup, verify:
 ```bash
@@ -226,7 +232,8 @@ Fallback: Constant TOP in `rgba32float` format (8-bit clamps to 0-1, freezing th
 
 **Resolution:** Non-Commercial caps at 1280×1280. Use `outputresolution = 'custom'`.
 
-**Large shaders:** Write GLSL to `/tmp/file.glsl`, then use `td_write_dat` or `td_execute_python` to load.
+**Large shaders:** Create a Text DAT, then write the complete GLSL source directly
+with `td_write_dat(path="/project1/shader_code", text="...")`.
 
 **Vertex/Point access (TD 2025.32):** `point.P[0]`, `point.P[1]`, `point.P[2]` — NOT `.x`, `.y`, `.z`.
 
@@ -321,7 +328,7 @@ See `references/network-patterns.md` for complete build scripts + shader code.
 
 - MCP runs on localhost only (port 40404). No authentication — any local process can send commands.
 - `td_execute_python` has unrestricted access to the TD Python environment and filesystem as the TD process user.
-- `setup.sh` downloads twozero.tox from the official 404zero.com URL. Verify the download if concerned.
+- Download twozero.tox only from the official 404zero.com URL and verify it if concerned.
 - The skill never sends data outside localhost. All MCP communication is local.
 
 ## References
@@ -349,7 +356,6 @@ See `references/network-patterns.md` for complete build scripts + shader code.
 | `references/replicator.md` | replicatorCOMP — data-driven cloning, layouts, callbacks |
 | `references/dat-scripting.md` | Execute DAT family — chop/dat/parameter/panel/op/executeDAT |
 | `references/3d-scene.md` | Lighting rigs, shadows, IBL/cubemaps, multi-camera, PBR |
-| `scripts/setup.sh` | Automated setup script |
 
 ---
 

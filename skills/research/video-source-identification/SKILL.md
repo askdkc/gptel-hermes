@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: video-source-identification
 description: Identify software, services, and workflows shown in user-supplied videos, especially when transcripts or direct playback are unavailable.
 version: 1.0.0
@@ -14,7 +15,7 @@ Use when a user shares a video and asks what software, service, UI, or local web
 
 ## Workflow
 
-1. **Resolve the video identity first.** Extract the video ID, title, channel, duration, and available description/metadata from the public video page. Do not infer the product from the URL alone.
+1. **Resolve the video identity first.** Extract the video ID, title, channel, duration, and available description/metadata from the public video page. Use optional web-search, web-extraction, or browser integrations for discovery when available; otherwise fetch the public page directly through the terminal. Do not infer the product from the URL alone.
 2. **Try the transcript path.** Use the installed YouTube transcript helper or `youtube_transcript_api`. If the request is blocked by a cloud-provider IP, do not repeatedly retry or claim the transcript is disabled.
 3. **Fallback to page metadata.** Parse the YouTube watch page for `videoDetails`, title, description, chapters, captions, and related links. Search the exact title plus distinctive UI terms when needed.
 4. **Correlate with authoritative product documentation.** For a suspected product, inspect its official docs, CLI help, repository, or source page. Verify the exact command, default host/port, and whether the UI opens a browser.

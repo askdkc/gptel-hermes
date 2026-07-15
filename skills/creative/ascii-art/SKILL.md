@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: ascii-art
 description: "ASCII art: pyfiglet, cowsay, boxes, image-to-ascii."
 version: 4.0.0
@@ -223,7 +224,8 @@ jp2a --colors image.jpg              # Colorized
 
 ## Tool 7: Search Pre-Made ASCII Art
 
-Search curated ASCII art from the web. Use `terminal` with `curl`.
+Search curated ASCII art from the web with `hermes_terminal`, using
+`program: "curl"` and an argv `arguments` array.
 
 ### Source A: ascii.co.uk (recommended for pre-made art)
 

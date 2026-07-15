@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: github-issues
 description: "Create, triage, label, assign GitHub issues via gh or REST."
 version: 1.1.0
@@ -14,6 +15,10 @@ metadata:
 # GitHub Issues Management
 
 Create, search, triage, and manage GitHub issues. Each section shows `gh` first, then the `curl` fallback.
+
+Run commands below through `hermes_terminal_authenticated`. The user must
+complete any interactive GitHub login outside the tool; terminal stdin is
+closed.
 
 ## Prerequisites
 

@@ -4,9 +4,15 @@ Base URL: `https://api.github.com`
 
 All requests need: `-H "Authorization: token $GITHUB_TOKEN"`
 
-Use the `gh-env.sh` helper to set `$GITHUB_TOKEN`, `$GH_OWNER`, `$GH_REPO` automatically:
+Resolve `skills/github/github-auth/scripts/gh-env.sh` with
+`hermes_skill_resource_path(name="github-auth", resource="scripts/gh-env.sh")`
+first. Source the returned absolute path and run the consuming command in the
+same authenticated terminal call; terminal calls do not share shell variables.
+When `gh` uses its keychain, the helper obtains the token with `gh auth token`
+before a curl fallback.  Fail before curl if no token is available:
+
 ```bash
-source "${HERMES_HOME:-$HOME/.hermes}/skills/github/github-auth/scripts/gh-env.sh"
+bash -c 'set -eu; . "$1"; : "${GITHUB_TOKEN:?GitHub token unavailable}"; curl -s -H "Authorization: token $GITHUB_TOKEN" "https://api.github.com/repos/$GH_OWNER/$GH_REPO"' bash "/absolute/path/returned-by-hermes_skill_resource_path"
 ```
 
 ## Repositories

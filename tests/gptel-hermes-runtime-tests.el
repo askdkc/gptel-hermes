@@ -186,6 +186,79 @@
                               (gptel-hermes-elisp-eval "(+ 1 2)")))
       (should-error (gptel-hermes-elisp-eval "(+ 1 2) (+ 3 4)")))))
 
+(ert-deftest gptel-hermes-runtime-authenticated-terminal-is-explicit-opt-in ()
+  (let ((process-environment '("HOME=/old-home" "SECRET_TOKEN=present"
+                               "PATH=/bin")))
+    (let ((sanitized
+           (gptel-hermes-runtime--terminal-environment "/tmp/hermes-home")))
+      (should (member "HOME=/tmp/hermes-home" sanitized))
+      (should-not (member "SECRET_TOKEN=present" sanitized)))
+    (let ((inherited
+           (gptel-hermes-runtime--terminal-environment "/Users/test" t)))
+      (should (member "HOME=/Users/test" inherited))
+      (should (member "SECRET_TOKEN=present" inherited)))
+    (let ((gptel-hermes-enable-authenticated-terminal nil))
+      (should-not
+       (member "hermes_terminal_authenticated"
+               (mapcar #'gptel-tool-name (gptel-hermes-runtime-tools))))
+      ;; Isolate the global gptel registry so this remains true even when a
+      ;; later test has already exercised the opt-in branch.
+      (let ((gptel--known-tools
+             (mapcar
+              (lambda (category)
+                (cons (car category)
+                      (cl-remove-if
+                       (lambda (entry)
+                         (equal (car entry) "hermes_terminal_authenticated"))
+                       (cdr category))))
+              gptel--known-tools)))
+        (should-error (gptel-get-tool "hermes_terminal_authenticated"))))
+    (let ((gptel-hermes-enable-authenticated-terminal t))
+      (should
+       (member "hermes_terminal_authenticated"
+               (mapcar #'gptel-tool-name (gptel-hermes-runtime-tools)))))))
+
+(ert-deftest gptel-hermes-runtime-authenticated-terminal-is-guarded-at-call-time ()
+  (let ((gptel-hermes-enable-authenticated-terminal nil)
+        result)
+    (gptel-hermes-terminal-authenticated
+     (lambda (value) (setq result value))
+     "/bin/sh" ["-c" "exit 0"])
+    (should (string-match-p "authenticated terminal is disabled" result))))
+
+(ert-deftest gptel-hermes-runtime-terminal-arguments-reject-control-newlines ()
+  (should (equal '("safe")
+                 (gptel-hermes-runtime--list-arguments ["safe"])))
+  (should-error
+   (gptel-hermes-runtime--list-arguments ["line\nbreak"]))
+  (should-error
+   (gptel-hermes-runtime--list-arguments ["line\rbreak"])))
+
+(ert-deftest gptel-hermes-runtime-authenticated-terminal-inherits-home-and-env ()
+  (let ((root (gptel-hermes-runtime-test--root))
+        (result-cell (list nil))
+        (gptel-hermes-enable-authenticated-terminal t))
+    (unwind-protect
+        (gptel-hermes-runtime-test--with-workspace
+         root
+         (lambda ()
+           (let ((process-environment
+                  (cons "GPTEL_HERMES_TEST_SECRET=present"
+                        process-environment)))
+             (gptel-hermes-terminal-authenticated
+              (lambda (result) (setcar result-cell result))
+              "/bin/sh"
+              ["-c" "printf '%s\\n%s' \"$HOME\" \"$GPTEL_HERMES_TEST_SECRET\""]
+              nil 2)
+             (let ((result (gptel-hermes-runtime-test--await result-cell)))
+               (should (string-match-p
+                        (regexp-quote
+                         (concat "STDOUT:\n"
+                                 (gptel-hermes-runtime--home-directory)
+                                 "\npresent"))
+                        result))))))
+      (delete-directory root t))))
+
 (ert-deftest gptel-hermes-runtime-terminal-is-async-and-sanitized ()
   (let ((root (gptel-hermes-runtime-test--root))
         (result-cell (list nil))
@@ -207,6 +280,38 @@
              (should (string-match-p "Exit status: 1" result))
              (should (string-match-p (concat "STDOUT:\n" "out") result))
              (should (string-match-p (concat "STDERR:\n" "err") result)))))
+      (delete-directory root t))))
+
+(ert-deftest gptel-hermes-runtime-terminal-detached-child-outlives-call ()
+  (skip-unless (and (executable-find "nohup") (file-executable-p "/bin/sh")))
+  (let ((root (gptel-hermes-runtime-test--root))
+        (result-cell (list nil)))
+    (unwind-protect
+        (gptel-hermes-runtime-test--with-workspace
+         root
+         (lambda ()
+           (gptel-hermes-terminal
+            (lambda (result) (setcar result-cell result))
+            "/bin/sh"
+            ["-c"
+             "set -eu; nohup \"$@\" >job.log 2>&1 </dev/null & echo $! >job.pid"
+             "sh" "/bin/sh" "-c" "sleep 0.2; printf done"]
+            nil 2)
+           (let ((result (gptel-hermes-runtime-test--await result-cell)))
+             (should (string-match-p "Exit status: 0" result)))
+           (let ((deadline (+ (float-time) 2))
+                 (log (expand-file-name "job.log" root)))
+             (while (and (< (float-time) deadline)
+                         (not (and (file-readable-p log)
+                                   (with-temp-buffer
+                                     (insert-file-contents log)
+                                     (search-forward "done" nil t)))))
+               (accept-process-output nil 0.05))
+             (should (file-readable-p log))
+             (should (equal "done"
+                            (with-temp-buffer
+                              (insert-file-contents log)
+                              (buffer-string)))))))
       (delete-directory root t))))
 
 (provide 'gptel-hermes-runtime-tests)

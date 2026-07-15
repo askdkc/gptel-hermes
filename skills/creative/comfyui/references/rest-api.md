@@ -178,7 +178,7 @@ user are broadcast to every connection. Filter messages client-side by
 | `0x00000003` | `TEXT` — `[type:4][nid_len:4][nid][text]` (UTF-8) |
 | `0x00000004` | `PREVIEW_IMAGE_WITH_METADATA` — `[type:4][meta_len:4][json][image_data]` |
 
-`scripts/ws_monitor.py --previews <dir>` saves preview frames to disk.
+`$SKILL_DIR/scripts/ws_monitor.py --previews <dir>` saves preview frames to disk.
 
 ## File Upload
 

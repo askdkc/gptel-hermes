@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: petdex
 description: Install and select animated petdex mascots for Hermes.
 version: 1.0.0
@@ -36,7 +37,10 @@ and the `display.pet` config — it does not generate sprites.
 
 ## How to Run
 
-Use the `terminal` tool to run `hermes pets <subcommand>`.
+Use `hermes_terminal_authenticated` with `program: "hermes"` and argv
+arguments to run `pets <subcommand>`. Petdex state lives under the real
+`HERMES_HOME`; standard `hermes_terminal` uses a temporary HOME and cannot
+see the installed pets or persistent selection.
 
 ## Quick Reference
 
@@ -45,9 +49,9 @@ Use the `terminal` tool to run `hermes pets <subcommand>`.
 | Browse the gallery | `hermes pets list` (add a substring to filter: `hermes pets list cat`) |
 | List installed pets | `hermes pets list --installed` |
 | Install a pet | `hermes pets install <slug>` (add `--select` to make it active) |
-| Set the active pet | `hermes pets select <slug>` (omit slug for a picker) |
+| Set the active pet | `hermes pets select <slug>`; do not omit the slug in Hermes terminal calls |
 | Resize the pet everywhere | `hermes pets scale <factor>` (e.g. `0.5`, clamped 0.1–3.0) |
-| Preview/animate in terminal | `hermes pets show [slug] [--cycle] [--state run]` |
+| Preview/animate in terminal | Run `hermes pets show [slug] [--cycle] [--state run]` in the user's interactive terminal |
 | Disable the pet | `hermes pets off` |
 | Remove a pet | `hermes pets remove <slug>` |
 | Diagnose setup | `hermes pets doctor` |
@@ -56,7 +60,12 @@ Use the `terminal` tool to run `hermes pets <subcommand>`.
 
 1. Find a pet: `hermes pets list <query>` and note its `slug`.
 2. Install + activate: `hermes pets install <slug> --select`.
-3. Preview it: `hermes pets show` (Ctrl+C to stop).
+   Always pass the explicit slug; the picker form without a slug is only for
+   the user's own interactive terminal.
+3. Ask the user to preview it in their own interactive terminal with
+   `hermes pets show` (Ctrl+C to stop). Hermes terminal calls use pipes with
+   stdin closed and have no TTY, so this preview cannot be run through
+   `hermes_terminal_authenticated`.
 4. Confirm setup: `hermes pets doctor` — shows the resolved pet, configured
    render mode, detected terminal graphics protocol, and effective mode.
 

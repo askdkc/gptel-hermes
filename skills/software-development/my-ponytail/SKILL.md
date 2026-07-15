@@ -1,4 +1,5 @@
 ---
+requires_tools: []
 name: my-ponytail
 description: Use when the user wants efficient, minimal, root-cause-first software development. Prefer deletion, reuse, standard-library or native solutions, and the smallest correct implementation without sacrificing correctness, security, accessibility, validation, and verification.
 version: 2.3.0

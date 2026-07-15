@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_file_read, hermes_apply_patch, hermes_terminal]
 name: groonga-full-text-debugging
 description: Diagnose and fix Groonga/PGroonga false positives, false negatives, token-boundary errors, and chained-normalizer metadata loss with reproducible token streams and verified source patches.
 version: 1.0.0

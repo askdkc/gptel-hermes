@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal, vision_analyze]
 name: findmy
 description: "Track Apple devices/AirTags via FindMy.app on macOS."
 version: 1.0.0
@@ -20,7 +21,7 @@ screen capture to read device locations.
 
 - **macOS** with Find My app and iCloud signed in
 - Devices/AirTags already registered in Find My
-- Screen Recording permission for terminal (System Settings → Privacy → Screen Recording)
+- Screen Recording permission for the calling Emacs process (System Settings → Privacy → Screen Recording)
 - **Optional but recommended**: Install `peekaboo` for better UI automation:
   `brew install steipete/tap/peekaboo`
 

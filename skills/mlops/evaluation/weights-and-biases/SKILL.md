@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: weights-and-biases
 description: "W&B: log ML experiments, sweeps, model registry, dashboards."
 version: 1.0.0
@@ -13,6 +14,10 @@ metadata:
 ---
 
 # Weights & Biases: ML Experiment Tracking & MLOps
+
+Run non-interactive commands below through `hermes_terminal_authenticated`.
+The user must complete `wandb login` outside the tool, because terminal stdin is
+closed.
 
 ## When to Use This Skill
 
@@ -33,11 +38,18 @@ Use Weights & Biases (W&B) when you need to:
 # Install W&B
 pip install wandb
 
-# Login (creates API key)
+# Login (the user runs this outside the tool; it creates an API key)
 wandb login
 
-# Or set API key programmatically
-export WANDB_API_KEY=your_api_key_here
+```
+
+Or set it in Emacs before using the authenticated terminal. The prompt is
+read locally and the key is never printed or stored in the workspace:
+
+```elisp
+(progn
+  (setenv "WANDB_API_KEY" (read-passwd "W&B API key: "))
+  nil)
 ```
 
 ## Quick Start
@@ -590,5 +602,3 @@ print(f"Share this URL: {run.url}")
 - `references/sweeps.md` - Comprehensive hyperparameter optimization guide
 - `references/artifacts.md` - Data and model versioning patterns
 - `references/integrations.md` - Framework-specific examples
-
-

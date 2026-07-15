@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal_authenticated]
 name: teams-meeting-pipeline
 description: "Operate the Teams meeting summary pipeline via Hermes CLI — summarize meetings, inspect pipeline status, replay jobs, manage Microsoft Graph subscriptions."
 version: 1.1.0
@@ -20,7 +21,9 @@ metadata:
 
 Use this skill whenever the user asks about Microsoft Teams meeting summaries, transcripts, recordings, action items, Graph subscriptions, or any operational question about the Teams meeting pipeline. Works in any language — the triggers below are examples, not an exhaustive list.
 
-Everything operator-facing is a `hermes teams-pipeline` subcommand run via the terminal tool. There are no new model tools for this pipeline — the CLI is the surface.
+Everything operator-facing is a `hermes teams-pipeline` subcommand run via
+`hermes_terminal_authenticated`. There are no new model tools for this
+pipeline — the CLI is the surface.
 
 ## When to use this skill
 
@@ -38,6 +41,9 @@ Multilingual trigger examples (not exhaustive):
 - Turkish: "Teams meeting özetle", "action item çıkar", "toplantı notu", "pipeline durumu", "replay job"
 
 ## Prerequisites
+
+The user must complete any interactive Microsoft login or consent setup outside
+the tool; terminal stdin is closed.
 
 Before using the pipeline, verify these are set in `${HERMES_HOME:-~/.hermes}/.env`:
 

@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_terminal]
 name: model-catalog-comparison
 description: Compare AI model catalogs using authoritative live metadata, pricing, capability positioning, and honest performance evidence; produce compact decision tables and performance-versus-cost diagrams.
 ---
@@ -9,7 +10,7 @@ Use when the user asks to compare named AI models, model tiers, pricing, benchma
 
 ## Workflow
 
-1. **Identify the catalog and exact IDs first.** Model nicknames are ambiguous. Search the relevant provider/catalog API or official model index and resolve names to canonical IDs. Do not assume that a name refers to a public model.
+1. **Identify the catalog and exact IDs first.** Model nicknames are ambiguous. Search the relevant provider/catalog API or official model index and resolve names to canonical IDs. Do not assume that a name refers to a public model. Use an available web-search integration for discovery when present; otherwise retrieve the official catalog directly through the terminal.
 2. **Prefer live authoritative metadata.** Read pricing, context length, modalities, output limits, descriptions, and capability notes from the provider's model endpoint or official docs. Record the retrieval date when the catalog is dynamic.
 3. **Separate evidence types.** Distinguish:
    - measured benchmark scores (with benchmark name, version, and source),

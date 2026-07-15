@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # GitHub environment detection helper for Hermes Agent skills.
 #
-# Usage (via terminal tool):
-#   source skills/github/github-auth/scripts/gh-env.sh
+# Usage: resolve this bundled resource with
+# hermes_skill_resource_path(name="github-auth", resource="scripts/gh-env.sh")
+# and source the returned absolute path through the authenticated terminal.
 #
 # After sourcing, these variables are set:
 #   GH_AUTH_METHOD  - "gh", "curl", or "none"
-#   GITHUB_TOKEN    - personal access token (set if method is "curl")
+#   GITHUB_TOKEN    - personal access token (set whenever one is available)
 #   GH_USER         - GitHub username
 #   GH_OWNER        - repo owner  (only if inside a git repo with a github remote)
 #   GH_REPO         - repo name   (only if inside a git repo with a github remote)
@@ -21,6 +22,11 @@ GH_USER=""
 if command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
     GH_AUTH_METHOD="gh"
     GH_USER=$(gh api user --jq '.login' 2>/dev/null)
+    # Curl fallbacks run in the same shell after sourcing this helper.  Export
+    # the keychain-backed gh token so those calls authenticate too.
+    if [ -z "$GITHUB_TOKEN" ]; then
+        GITHUB_TOKEN=$(gh auth token 2>/dev/null || true)
+    fi
 elif [ -n "$GITHUB_TOKEN" ]; then
     GH_AUTH_METHOD="curl"
 elif _hermes_env="${HERMES_HOME:-$HOME/.hermes}/.env"; [ -f "$_hermes_env" ] && grep -q "^GITHUB_TOKEN=" "$_hermes_env" 2>/dev/null; then
@@ -48,7 +54,7 @@ GH_OWNER=""
 GH_REPO=""
 GH_OWNER_REPO=""
 
-_remote_url=$(git remote get-url origin 2>/dev/null)
+_remote_url=$(git remote get-url origin 2>/dev/null || true)
 if [ -n "$_remote_url" ] && echo "$_remote_url" | grep -q "github.com"; then
     GH_OWNER_REPO=$(echo "$_remote_url" | sed -E 's|.*github\.com[:/]||; s|\.git$||')
     GH_OWNER=$(echo "$GH_OWNER_REPO" | cut -d/ -f1)

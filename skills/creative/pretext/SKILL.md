@@ -1,4 +1,5 @@
 ---
+requires_tools: [hermes_skill_view, hermes_file_write]
 name: pretext
 description: "Use when building creative browser demos with @chenglou/pretext — DOM-free text layout for ASCII art, typographic flow around obstacles, text-as-geometry games, kinetic typography, and text-powered generative art. Produces single-file HTML demos by default."
 version: 1.0.0
@@ -150,10 +151,13 @@ See `templates/donut-orbit.html` and `templates/hello-orb-flow.html` for working
 ## Workflow
 
 1. **Pick a pattern** from the table above based on the user's brief.
-2. **Start from a template**:
+2. **Start from a template**. Load it with
+   `hermes_skill_view(name="pretext", resource="templates/hello-orb-flow.html")`
+   or the advanced template resource:
    - `templates/hello-orb-flow.html` — text reflowing around a moving orb (reflow-around-obstacle pattern)
    - `templates/donut-orbit.html` — advanced example: measured ASCII logo obstacles, draggable wire sphere/cube, morphing shape fields, selectable DOM text, and dev-only controls
-   - `write_file` to a new `.html` in `/tmp/` or the user's workspace.
+   - `hermes_file_write` with `mode: "create"` to a new workspace-relative
+     `.html`; read first and pass its SHA when replacing an existing file.
 3. **Swap the corpus** for something intentional to the brief. Real prose, 10-100 sentences, no lorem.
 4. **Tune the aesthetic** — font, palette, composition, interaction. This is the work; don't skip it.
 5. **Verify locally**:

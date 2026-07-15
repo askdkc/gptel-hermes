@@ -1,149 +1,73 @@
 ---
+requires_tools: [hermes_terminal, hermes_terminal_authenticated]
 name: codex
-description: "Delegate coding to OpenAI Codex CLI (features, PRs)."
-version: 1.0.0
+description: "Delegate bounded coding and review tasks to the Codex CLI."
+version: 1.1.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
 metadata:
   hermes:
-    tags: [Coding-Agent, Codex, OpenAI, Code-Review, Refactoring]
-    related_skills: [claude-code, hermes-agent]
+    tags: [Coding-Agent, Codex, Autonomous, Refactoring, Code-Review]
+    related_skills: [claude-code, opencode, hermes-agent]
 ---
 
 # Codex CLI
 
-Delegate coding tasks to [Codex](https://github.com/openai/codex) via the Hermes terminal. Codex is OpenAI's autonomous coding agent CLI.
-
-## When to use
-
-- Building features
-- Refactoring
-- PR reviews
-- Batch issue fixing
-
-Requires the codex CLI and a git repository.
+Use [Codex](https://github.com/openai/codex) for a bounded coding or review task
+in the current workspace. This bundled Skill supports foreground, one-shot
+invocations only.
 
 ## Prerequisites
 
-- Codex installed: `npm install -g @openai/codex`
-- OpenAI auth configured: either `OPENAI_API_KEY` or Codex OAuth credentials
-  from the Codex CLI login flow
-- **Must run inside a git repository** — Codex refuses to run outside one
-- Use `pty=true` in terminal calls — Codex is an interactive terminal app
+- The `codex` executable is installed and authenticated.
+- The requested repository is the current workspace or a workspace-relative
+  directory.
+- The task has a clear scope and a bounded verification command.
 
-For Hermes itself, `model.provider: openai-codex` uses Hermes-managed Codex
-OAuth from `~/.hermes/auth.json` after `hermes auth add openai-codex`. For the
-standalone Codex CLI, a valid CLI OAuth session may live under
-`~/.codex/auth.json`; do not treat a missing `OPENAI_API_KEY` alone as proof
-that Codex auth is missing.
+Check readiness when needed:
 
-## One-Shot Tasks
-
-```
-terminal(command="codex exec 'Add dark mode toggle to settings'", workdir="~/project", pty=true)
+```python
+hermes_terminal_authenticated(program="codex", arguments=["--version"], cwd=".")
 ```
 
-For scratch work (Codex needs a git repo):
-```
-terminal(command="cd $(mktemp -d) && git init && codex exec 'Build a snake game in Python'", pty=true)
-```
+## One-shot coding task
 
-## Background Mode (Long Tasks)
+Pass the complete task as one prompt and keep the working directory explicit.
+Authenticated agent calls are source-editing only: do not ask Codex to run
+project tests, builds, hooks, package scripts, or other repository-controlled
+commands. Run verification later through the sanitized terminal.
 
-```
-# Start in background with PTY
-terminal(command="codex exec --full-auto 'Refactor the auth module'", workdir="~/project", background=true, pty=true)
-# Returns session_id
-
-# Monitor progress
-process(action="poll", session_id="<id>")
-process(action="log", session_id="<id>")
-
-# Send input if Codex asks a question
-process(action="submit", session_id="<id>", data="yes")
-
-# Kill if needed
-process(action="kill", session_id="<id>")
+```python
+hermes_terminal_authenticated(
+    program="codex",
+    arguments=["exec", "Add dark mode to the settings screen. Edit files only; leave all project command execution to the caller."],
+    cwd=".",
+    timeout=300)
 ```
 
-## Key Flags
+## Review task
 
-| Flag | Effect |
-|------|--------|
-| `exec "prompt"` | One-shot execution, exits when done |
-| `--full-auto` | Sandboxed but auto-approves file changes in workspace |
-| `--yolo` | No sandbox, no approvals (fastest, most dangerous) |
-| `--sandbox danger-full-access` | No Codex sandbox; useful when the host service context breaks bubblewrap |
+Ask Codex to inspect the current diff and return findings without changing the
+workspace:
 
-## Hermes Gateway Caveat
-
-When invoking the Codex CLI from a Hermes gateway/service context (for example,
-Telegram-driven agent sessions), Codex `workspace-write` sandboxing may fail even
-when the same command works in the user's interactive shell. A typical symptom is
-bubblewrap/user-namespace errors such as `setting up uid map: Permission denied`
-or `loopback: Failed RTM_NEWADDR: Operation not permitted`.
-
-In that context, prefer:
-
-```
-codex exec --sandbox danger-full-access "<task>"
+```python
+hermes_terminal_authenticated(
+    program="codex",
+    arguments=["exec", "review", "--uncommitted"],
+    cwd=".",
+    timeout=300)
 ```
 
-Use process boundaries as the safety layer instead: explicit `workdir`, clean git
-status before launch, narrow task prompts, `git diff` review, targeted tests, and
-human/agent confirmation before committing broad changes.
+## Verification and handoff
 
-## PR Reviews
+After the command exits, inspect the reported files and run the project's
+verification command in a separate `hermes_terminal` call. Use
+`hermes_terminal_authenticated` only when verification explicitly requires
+persistent user credentials or the real HOME, and never for untrusted
+repository-controlled code. Report the command, exit result, changed files,
+and any unresolved findings.
 
-Clone to a temp directory for safe review:
-
-```
-terminal(command="REVIEW=$(mktemp -d) && git clone https://github.com/user/repo.git $REVIEW && cd $REVIEW && gh pr checkout 42 && codex review --base origin/main", pty=true)
-```
-
-## Parallel Issue Fixing with Worktrees
-
-```
-# Create worktrees
-terminal(command="git worktree add -b fix/issue-78 /tmp/issue-78 main", workdir="~/project")
-terminal(command="git worktree add -b fix/issue-99 /tmp/issue-99 main", workdir="~/project")
-
-# Launch Codex in each
-terminal(command="codex --yolo exec 'Fix issue #78: <description>. Commit when done.'", workdir="/tmp/issue-78", background=true, pty=true)
-terminal(command="codex --yolo exec 'Fix issue #99: <description>. Commit when done.'", workdir="/tmp/issue-99", background=true, pty=true)
-
-# Monitor
-process(action="list")
-
-# After completion, push and create PRs
-terminal(command="cd /tmp/issue-78 && git push -u origin fix/issue-78")
-terminal(command="gh pr create --repo user/repo --head fix/issue-78 --title 'fix: ...' --body '...'")
-
-# Cleanup
-terminal(command="git worktree remove /tmp/issue-78", workdir="~/project")
-```
-
-## Batch PR Reviews
-
-```
-# Fetch all PR refs
-terminal(command="git fetch origin '+refs/pull/*/head:refs/remotes/origin/pr/*'", workdir="~/project")
-
-# Review multiple PRs in parallel
-terminal(command="codex exec 'Review PR #86. git diff origin/main...origin/pr/86'", workdir="~/project", background=true, pty=true)
-terminal(command="codex exec 'Review PR #87. git diff origin/main...origin/pr/87'", workdir="~/project", background=true, pty=true)
-
-# Post results
-terminal(command="gh pr comment 86 --body '<review>'", workdir="~/project")
-```
-
-## Rules
-
-1. **Always use `pty=true`** — Codex is an interactive terminal app and hangs without a PTY
-2. **Git repo required** — Codex won't run outside a git directory. Use `mktemp -d && git init` for scratch
-3. **Use `exec` for one-shots** — `codex exec "prompt"` runs and exits cleanly
-4. **`--full-auto` for building** — auto-approves changes within the sandbox
-5. **Background for long tasks** — use `background=true` and monitor with `process` tool
-6. **Don't interfere** — monitor with `poll`/`log`, be patient with long-running tasks
-7. **Parallel is fine** — run multiple Codex processes at once for batch work
+This Skill deliberately does not promise interactive TUI input, PTY control,
+background execution, process polling, or session continuation. Those require
+an external integration that is not part of the standard Hermes tool set.
